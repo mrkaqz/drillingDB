@@ -87,6 +87,14 @@ def _import_one(
         return {"status": "error", "message": f"Slide sheet parse error: {e}"}
     parsed.source_filename = slide_path.name
 
+    # Validate: must be a motor slide sheet (has both rotation and sliding intervals)
+    has_sliding = any("slide" in iv.mode.lower() for iv in parsed.intervals)
+    if not has_sliding:
+        return {
+            "status": "skipped",
+            "message": "Not a motor slide sheet — no sliding intervals found. Skipped.",
+        }
+
     # Parse BHA config if provided
     motor_bent_deg: Optional[float] = None
     motor_make: Optional[str] = None
