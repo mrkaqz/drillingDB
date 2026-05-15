@@ -4,9 +4,10 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
 from ..config import UPLOAD_DIR, DEFAULT_STAND_LENGTH_FT
@@ -302,3 +303,69 @@ def run_batch_import(
                 shutil.move(str(bha), done_path / bha.name)
 
     return {"results": results, "done_folder": str(done_path)}
+
+
+@router.post("/upload")
+async def batch_upload_import(
+    files: List[UploadFile] = File(...),
+    stand_length_ft: float = Form(DEFAULT_STAND_LENGTH_FT),
+    db: Session = Depends(get_db),
+):
+    """Accept uploaded xlsx files, pair them, and import all slide+BHA pairs."""
+    # Save uploaded files to a temp subdir so _scan_folder can pair them
+    batch_dir = UPLOAD_DIR / f"batch_{uuid4().hex[:8]}"
+    batch_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        for f in files:
+            dest = batch_dir / (f.filename or f.filename)
+            dest.write_bytes(await f.read())
+
+        groups = _scan_folder(batch_dir)
+        results = []
+        ok_count = skipped_count = error_count = 0
+
+        for g in groups:
+            slide: Optional[Path] = g["slide"]
+            bha: Optional[Path] = g["bha"]
+
+            if slide is None:
+                results.append({
+                    "key": g["key"],
+                    "slide_file": None,
+                    "bha_file": bha.name if bha else None,
+                    "status": "skipped",
+                    "message": "No slide sheet found — skipped.",
+                })
+                skipped_count += 1
+                continue
+
+            # Archive copies to UPLOAD_DIR root (consistent with folder-path flow)
+            slide_dest = UPLOAD_DIR / slide.name
+            shutil.copy2(slide, slide_dest)
+            bha_dest: Optional[Path] = None
+            if bha:
+                bha_dest = UPLOAD_DIR / bha.name
+                shutil.copy2(bha, bha_dest)
+
+            result = _import_one(slide_dest, bha_dest, stand_length_ft, db)
+            result["key"] = g["key"]
+            result["slide_file"] = slide.name
+            result["bha_file"] = bha.name if bha else None
+            results.append(result)
+
+            if result["status"] == "ok":
+                ok_count += 1
+            else:
+                error_count += 1
+
+    finally:
+        shutil.rmtree(batch_dir, ignore_errors=True)
+
+    return {
+        "results": results,
+        "total": len(results),
+        "ok": ok_count,
+        "errors": error_count,
+        "skipped": skipped_count,
+    }

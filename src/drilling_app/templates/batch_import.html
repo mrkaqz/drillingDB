@@ -3,26 +3,48 @@
 {% block content %}
 <div class="mb-6">
   <h1 class="text-2xl font-bold text-gray-900">Batch Import</h1>
-  <p class="text-gray-500 mt-1">Scan a folder for slide sheets and BHA config files, preview pairings, then import all at once.</p>
+  <p class="text-gray-500 mt-1">Import multiple slide sheets and BHA configs at once.</p>
 </div>
 
-<div x-data="batchImport()" x-cloak>
+<!-- Tab switcher -->
+<div x-data="{ tab: 'upload' }" class="mb-6">
+  <div class="flex border-b border-gray-200 mb-6">
+    <button @click="tab = 'upload'"
+            :class="tab === 'upload' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'"
+            class="px-5 py-2.5 text-sm font-medium -mb-px transition-colors">
+      Upload Files
+    </button>
+    <button @click="tab = 'folder'"
+            :class="tab === 'folder' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'"
+            class="px-5 py-2.5 text-sm font-medium -mb-px transition-colors">
+      Folder Path
+    </button>
+  </div>
 
-  <!-- Folder settings card -->
-  <div class="card mb-6">
-    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Folder Settings</h2>
-    <div class="grid grid-cols-1 gap-4 mb-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Source Folder <span class="text-red-500">*</span></label>
-        <input type="text" x-model="folder" placeholder="e.g. C:\Users\...\batch import"
-               class="w-full border rounded px-3 py-2 text-sm font-mono focus:ring-blue-500 focus:border-blue-500">
-        <p class="text-xs text-gray-400 mt-1">Full path to the folder containing slide sheets and BHA Final reports.</p>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Done Folder <span class="text-gray-400 font-normal">(optional)</span></label>
-        <input type="text" x-model="doneFolder" placeholder="Leave blank to use source folder\imported"
-               class="w-full border rounded px-3 py-2 text-sm font-mono">
-        <p class="text-xs text-gray-400 mt-1">Successfully imported files will be moved here. Defaults to a subfolder called <code>imported</code> inside the source folder.</p>
+  <!-- ── Upload Files tab ─────────────────────────────────────── -->
+  <div x-show="tab === 'upload'" x-data="uploadBatch()">
+
+    <!-- Drop zone + file picker -->
+    <div x-show="groups.length === 0 && results.length === 0">
+      <div class="card mb-4"
+           @dragover.prevent="dragOver = true"
+           @dragleave.prevent="dragOver = false"
+           @drop.prevent="dragOver = false; onFiles($event.dataTransfer.files)"
+           :class="dragOver ? 'border-2 border-blue-400 bg-blue-50' : 'border-2 border-dashed border-gray-300'"
+           style="transition: all 0.15s">
+        <div class="flex flex-col items-center justify-center py-12 text-center">
+          <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p class="text-gray-600 font-medium mb-1">Drag &amp; drop xlsx files here</p>
+          <p class="text-gray-400 text-sm mb-4">or click to browse — select all slide sheets and BHA Final reports together</p>
+          <label class="btn-primary text-sm cursor-pointer">
+            Browse Files
+            <input type="file" multiple accept=".xlsx,.xls" class="hidden"
+                   @change="onFiles($event.target.files)">
+          </label>
+        </div>
       </div>
       <div class="max-w-xs">
         <label class="block text-sm font-medium text-gray-700 mb-1">Stand Length (ft)</label>
@@ -30,110 +52,313 @@
                class="w-full border rounded px-3 py-2 text-sm">
       </div>
     </div>
-    <div class="flex gap-3">
-      <button @click="preview()" :disabled="scanning || !folder.trim()"
-              class="btn-secondary text-sm">
-        <span x-show="!scanning">Scan Folder</span>
-        <span x-show="scanning">Scanning…</span>
-      </button>
-    </div>
-    <div x-show="scanError" class="mt-3 text-sm text-red-600" x-text="scanError"></div>
-  </div>
 
-  <!-- Preview card -->
-  <div class="card mb-6" x-show="groups.length > 0">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="text-lg font-semibold">
-        Found <span x-text="groups.length"></span> well group<span x-show="groups.length !== 1">s</span>
-      </h2>
-      <button @click="runImport()" :disabled="importing || groups.filter(g => g.can_import).length === 0"
-              class="btn-primary text-sm">
-        <span x-show="!importing">Import All (<span x-text="groups.filter(g => g.can_import).length"></span> wells)</span>
-        <span x-show="importing">Importing…</span>
-      </button>
-    </div>
+    <!-- Pairing preview -->
+    <div x-show="groups.length > 0 && results.length === 0" class="card mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-semibold">
+            <span x-text="groups.length"></span> well group<span x-show="groups.length !== 1">s</span> detected
+          </h2>
+          <p class="text-sm text-gray-500 mt-0.5">
+            <span x-text="groups.filter(g => g.canImport).length"></span> ready to import
+            <span x-show="groups.some(g => !g.canImport)" class="text-yellow-600">
+              · <span x-text="groups.filter(g => !g.canImport).length"></span> will be skipped (no slide sheet)
+            </span>
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button @click="groups = []; results = []" class="btn-secondary text-sm">Clear</button>
+          <button @click="runImport()"
+                  :disabled="importing || groups.filter(g => g.canImport).length === 0"
+                  class="btn-primary text-sm">
+            <span x-show="!importing">
+              Import <span x-text="groups.filter(g => g.canImport).length"></span> pair<span x-show="groups.filter(g=>g.canImport).length !== 1">s</span>
+            </span>
+            <span x-show="importing" class="flex items-center gap-2">
+              <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              Uploading &amp; processing <span x-text="fileCount"></span> files…
+            </span>
+          </button>
+        </div>
+      </div>
 
-    <div class="overflow-x-auto border border-gray-200 rounded-lg">
-      <table class="min-w-full divide-y divide-gray-200 text-sm">
-        <thead>
-          <tr>
-            <th class="table-head text-left">Well Group</th>
-            <th class="table-head text-left">Slide Sheet</th>
-            <th class="table-head text-left">BHA Config</th>
-            <th class="table-head text-center">Ready</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-100">
-          <template x-for="g in groups" :key="g.key">
-            <tr :class="g.can_import ? 'bg-white' : 'bg-yellow-50'">
-              <td class="px-4 py-3 font-medium text-gray-900" x-text="g.key"></td>
-              <td class="px-4 py-3 text-gray-600 text-xs font-mono" x-text="g.slide_file || '—'"></td>
-              <td class="px-4 py-3 text-gray-600 text-xs font-mono">
-                <span x-show="g.bha_file" x-text="g.bha_file" class="text-green-700"></span>
-                <span x-show="!g.bha_file" class="text-gray-400">No BHA file (motor details manual)</span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <span x-show="g.can_import" class="text-green-600 font-bold">✓</span>
-                <span x-show="!g.can_import" class="text-yellow-600 font-bold">⚠</span>
-              </td>
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead>
+            <tr>
+              <th class="table-head text-left">Well Group</th>
+              <th class="table-head text-left">Slide Sheet</th>
+              <th class="table-head text-left">BHA Config</th>
+              <th class="table-head text-center">Ready</th>
             </tr>
-          </template>
-        </tbody>
-      </table>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <template x-for="g in groups" :key="g.key">
+              <tr :class="g.canImport ? 'bg-white' : 'bg-yellow-50'">
+                <td class="px-4 py-3 font-medium text-gray-900" x-text="g.key"></td>
+                <td class="px-4 py-3 text-gray-600 text-xs font-mono" x-text="g.slide ? g.slide.name : '—'"></td>
+                <td class="px-4 py-3 text-xs font-mono">
+                  <span x-show="g.bha" x-text="g.bha ? g.bha.name : ''" class="text-green-700"></span>
+                  <span x-show="!g.bha" class="text-gray-400">No BHA file</span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span x-show="g.canImport" class="text-green-600 font-bold">✓</span>
+                  <span x-show="!g.canImport" class="text-yellow-600 font-bold">⚠</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-3 max-w-xs">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Stand Length (ft)</label>
+        <input type="number" x-model.number="standLength" min="1" step="1"
+               class="w-full border rounded px-3 py-2 text-sm">
+      </div>
     </div>
-    <p x-show="groups.some(g => !g.can_import)" class="text-xs text-yellow-700 mt-2">
-      ⚠ Groups without a slide sheet will be skipped.
-    </p>
-  </div>
 
-  <!-- Results card -->
-  <div class="card" x-show="results.length > 0">
-    <h2 class="text-lg font-semibold mb-1">Import Results</h2>
-    <p class="text-sm text-gray-500 mb-4">
-      Imported files moved to: <code class="bg-gray-100 px-1 rounded" x-text="doneResult"></code>
-    </p>
+    <!-- Results -->
+    <div x-show="results.length > 0" class="card">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-semibold mb-0.5">Import Results</h2>
+          <p class="text-sm text-gray-500">
+            <span class="text-green-700 font-medium" x-text="summary.ok + ' imported'"></span>
+            <span x-show="summary.skipped"> · <span x-text="summary.skipped + ' skipped'"></span></span>
+            <span x-show="summary.errors" class="text-red-600"> · <span x-text="summary.errors + ' errors'"></span></span>
+          </p>
+        </div>
+      </div>
 
-    <div class="overflow-x-auto border border-gray-200 rounded-lg">
-      <table class="min-w-full divide-y divide-gray-200 text-sm">
-        <thead>
-          <tr>
-            <th class="table-head text-left">Well</th>
-            <th class="table-head text-left">Slide Sheet</th>
-            <th class="table-head text-left">BHA Config</th>
-            <th class="table-head text-center">Status</th>
-            <th class="table-head text-left">Detail</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-100">
-          <template x-for="r in results" :key="r.key">
-            <tr :class="r.status === 'ok' ? 'bg-green-50' : r.status === 'skipped' ? 'bg-yellow-50' : 'bg-red-50'">
-              <td class="px-4 py-3 font-medium">
-                <a x-show="r.well_id" :href="'/wells/' + r.well_id" class="text-blue-600 hover:underline" x-text="r.well_name || r.key"></a>
-                <span x-show="!r.well_id" x-text="r.key"></span>
-              </td>
-              <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.slide_file || '—'"></td>
-              <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.bha_file || '—'"></td>
-              <td class="px-4 py-3 text-center font-semibold">
-                <span x-show="r.status === 'ok'" class="text-green-700">Imported</span>
-                <span x-show="r.status === 'skipped'" class="text-yellow-700">Skipped</span>
-                <span x-show="r.status === 'error'" class="text-red-700">Error</span>
-              </td>
-              <td class="px-4 py-3 text-xs text-gray-600" x-text="r.message"></td>
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead>
+            <tr>
+              <th class="table-head text-left">Well</th>
+              <th class="table-head text-left">Slide Sheet</th>
+              <th class="table-head text-left">BHA Config</th>
+              <th class="table-head text-center">Status</th>
+              <th class="table-head text-left">Detail</th>
             </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <template x-for="r in results" :key="r.key">
+              <tr :class="r.status === 'ok' ? 'bg-green-50' : r.status === 'skipped' ? 'bg-yellow-50' : 'bg-red-50'">
+                <td class="px-4 py-3 font-medium">
+                  <a x-show="r.well_id" :href="'/wells/' + r.well_id"
+                     class="text-blue-600 hover:underline" x-text="r.well_name || r.key"></a>
+                  <span x-show="!r.well_id" x-text="r.key"></span>
+                </td>
+                <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.slide_file || '—'"></td>
+                <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.bha_file || '—'"></td>
+                <td class="px-4 py-3 text-center font-semibold">
+                  <span x-show="r.status === 'ok'" class="text-green-700">Imported</span>
+                  <span x-show="r.status === 'skipped'" class="text-yellow-700">Skipped</span>
+                  <span x-show="r.status === 'error'" class="text-red-700">Error</span>
+                </td>
+                <td class="px-4 py-3 text-xs text-gray-600" x-text="r.message"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
 
-    <div class="mt-4 flex gap-3">
-      <a href="/" class="btn-primary text-sm">View Dashboard</a>
-      <button @click="reset()" class="btn-secondary text-sm">Import Another Folder</button>
+      <div class="mt-4 flex gap-3">
+        <a href="/" class="btn-primary text-sm">View Dashboard</a>
+        <button @click="reset()" class="btn-secondary text-sm">Import More Files</button>
+      </div>
     </div>
   </div>
 
+  <!-- ── Folder Path tab ──────────────────────────────────────── -->
+  <div x-show="tab === 'folder'" x-data="batchImport()">
+
+    <div class="card mb-6">
+      <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Folder Settings</h2>
+      <div class="grid grid-cols-1 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Source Folder <span class="text-red-500">*</span></label>
+          <input type="text" x-model="folder" placeholder="e.g. C:\Users\...\batch import"
+                 class="w-full border rounded px-3 py-2 text-sm font-mono focus:ring-blue-500 focus:border-blue-500">
+          <p class="text-xs text-gray-400 mt-1">Full path to the folder containing slide sheets and BHA Final reports.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Done Folder <span class="text-gray-400 font-normal">(optional)</span></label>
+          <input type="text" x-model="doneFolder" placeholder="Leave blank to use source folder\imported"
+                 class="w-full border rounded px-3 py-2 text-sm font-mono">
+          <p class="text-xs text-gray-400 mt-1">Successfully imported files will be moved here. Defaults to a subfolder called <code>imported</code> inside the source folder.</p>
+        </div>
+        <div class="max-w-xs">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Stand Length (ft)</label>
+          <input type="number" x-model.number="standLength" min="1" step="1"
+                 class="w-full border rounded px-3 py-2 text-sm">
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <button @click="preview()" :disabled="scanning || !folder.trim()" class="btn-secondary text-sm">
+          <span x-show="!scanning">Scan Folder</span>
+          <span x-show="scanning">Scanning…</span>
+        </button>
+      </div>
+      <div x-show="scanError" class="mt-3 text-sm text-red-600" x-text="scanError"></div>
+    </div>
+
+    <div class="card mb-6" x-show="groups.length > 0">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold">
+          Found <span x-text="groups.length"></span> well group<span x-show="groups.length !== 1">s</span>
+        </h2>
+        <button @click="runImport()" :disabled="importing || groups.filter(g => g.can_import).length === 0"
+                class="btn-primary text-sm">
+          <span x-show="!importing">Import All (<span x-text="groups.filter(g => g.can_import).length"></span> wells)</span>
+          <span x-show="importing">Importing…</span>
+        </button>
+      </div>
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead>
+            <tr>
+              <th class="table-head text-left">Well Group</th>
+              <th class="table-head text-left">Slide Sheet</th>
+              <th class="table-head text-left">BHA Config</th>
+              <th class="table-head text-center">Ready</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <template x-for="g in groups" :key="g.key">
+              <tr :class="g.can_import ? 'bg-white' : 'bg-yellow-50'">
+                <td class="px-4 py-3 font-medium text-gray-900" x-text="g.key"></td>
+                <td class="px-4 py-3 text-gray-600 text-xs font-mono" x-text="g.slide_file || '—'"></td>
+                <td class="px-4 py-3 text-xs font-mono">
+                  <span x-show="g.bha_file" x-text="g.bha_file" class="text-green-700"></span>
+                  <span x-show="!g.bha_file" class="text-gray-400">No BHA file (motor details manual)</span>
+                </td>
+                <td class="px-4 py-3 text-center">
+                  <span x-show="g.can_import" class="text-green-600 font-bold">✓</span>
+                  <span x-show="!g.can_import" class="text-yellow-600 font-bold">⚠</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <p x-show="groups.some(g => !g.can_import)" class="text-xs text-yellow-700 mt-2">
+        ⚠ Groups without a slide sheet will be skipped.
+      </p>
+    </div>
+
+    <div class="card" x-show="results.length > 0">
+      <h2 class="text-lg font-semibold mb-1">Import Results</h2>
+      <p class="text-sm text-gray-500 mb-4">
+        Imported files moved to: <code class="bg-gray-100 px-1 rounded" x-text="doneResult"></code>
+      </p>
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead>
+            <tr>
+              <th class="table-head text-left">Well</th>
+              <th class="table-head text-left">Slide Sheet</th>
+              <th class="table-head text-left">BHA Config</th>
+              <th class="table-head text-center">Status</th>
+              <th class="table-head text-left">Detail</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-100">
+            <template x-for="r in results" :key="r.key">
+              <tr :class="r.status === 'ok' ? 'bg-green-50' : r.status === 'skipped' ? 'bg-yellow-50' : 'bg-red-50'">
+                <td class="px-4 py-3 font-medium">
+                  <a x-show="r.well_id" :href="'/wells/' + r.well_id"
+                     class="text-blue-600 hover:underline" x-text="r.well_name || r.key"></a>
+                  <span x-show="!r.well_id" x-text="r.key"></span>
+                </td>
+                <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.slide_file || '—'"></td>
+                <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.bha_file || '—'"></td>
+                <td class="px-4 py-3 text-center font-semibold">
+                  <span x-show="r.status === 'ok'" class="text-green-700">Imported</span>
+                  <span x-show="r.status === 'skipped'" class="text-yellow-700">Skipped</span>
+                  <span x-show="r.status === 'error'" class="text-red-700">Error</span>
+                </td>
+                <td class="px-4 py-3 text-xs text-gray-600" x-text="r.message"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-4 flex gap-3">
+        <a href="/" class="btn-primary text-sm">View Dashboard</a>
+        <button @click="reset()" class="btn-secondary text-sm">Import Another Folder</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
+function uploadBatch() {
+  return {
+    groups:     [],
+    results:    [],
+    summary:    { ok: 0, errors: 0, skipped: 0 },
+    standLength: 100,
+    importing:  false,
+    dragOver:   false,
+    fileCount:  0,
+
+    onFiles(fileList) {
+      this.results = [];
+      this.groups = this.pairFiles(fileList);
+      this.fileCount = fileList.length;
+    },
+
+    pairFiles(fileList) {
+      const groups = {};
+      for (const f of fileList) {
+        const stem = f.name.replace(/\.[^.]+$/, '');
+        const key = stem.split('_')[0].trim();
+        if (!groups[key]) groups[key] = { key, slide: null, bha: null, canImport: false };
+        if (stem.toLowerCase().includes('_final')) groups[key].bha = f;
+        else groups[key].slide = f;
+      }
+      return Object.values(groups)
+        .map(g => ({ ...g, canImport: g.slide !== null }))
+        .sort((a, b) => a.key.localeCompare(b.key));
+    },
+
+    async runImport() {
+      this.importing = true;
+      this.results = [];
+      try {
+        const fd = new FormData();
+        fd.append('stand_length_ft', this.standLength);
+        for (const g of this.groups) {
+          if (g.slide) fd.append('files', g.slide, g.slide.name);
+          if (g.bha)   fd.append('files', g.bha,   g.bha.name);
+        }
+        const resp = await fetch('/api/batch/upload', { method: 'POST', body: fd });
+        const data = await resp.json();
+        this.results = data.results;
+        this.summary = { ok: data.ok, errors: data.errors, skipped: data.skipped };
+        this.groups = [];
+      } catch (e) {
+        alert('Upload import failed: ' + e);
+      } finally {
+        this.importing = false;
+      }
+    },
+
+    reset() {
+      this.groups = [];
+      this.results = [];
+      this.summary = { ok: 0, errors: 0, skipped: 0 };
+      this.fileCount = 0;
+    },
+  }
+}
+
 function batchImport() {
   return {
     folder:      {{ default_folder | tojson }},
@@ -177,7 +402,7 @@ function batchImport() {
         if (data.error) { alert(data.error); return; }
         this.results = data.results;
         this.doneResult = data.done_folder;
-        this.groups = []; // hide preview once results are shown
+        this.groups = [];
       } catch (e) {
         alert('Batch import failed: ' + e);
       } finally {
