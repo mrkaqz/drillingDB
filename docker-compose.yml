@@ -1,13 +1,17 @@
 services:
   app:
-    build: .
+    image: ghcr.io/mrkaqz/drillingdb:latest
     ports:
       - "7000:7000"
     environment:
       - DATA_DIR=/data
     volumes:
-      - drilling_data:/data
+      - drilling_db:/data/db
+      - drilling_uploads:/data/uploads
+      - drilling_exports:/data/exports
     restart: unless-stopped
 
 volumes:
-  drilling_data:
+  drilling_db:       # SQLite database file
+  drilling_uploads:  # Uploaded source xlsx files
+  drilling_exports:  # Generated export xlsx files
