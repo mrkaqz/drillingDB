@@ -93,10 +93,13 @@
           </p>
         </div>
         <div class="flex gap-2">
-          <button @click="reset()" class="btn-secondary text-sm">Clear</button>
+          <button @click="reset()"
+                  class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
+            Clear
+          </button>
           <button @click="runImport()"
                   :disabled="importing || groups.filter(g => g.canImport).length === 0"
-                  class="btn-primary text-sm">
+                  class="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
             <span x-show="!importing">
               Import <span x-text="groups.filter(g => g.canImport).length"></span> pair<span x-show="groups.filter(g=>g.canImport).length !== 1">s</span>
             </span>
