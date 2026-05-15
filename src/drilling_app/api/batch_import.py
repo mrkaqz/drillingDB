@@ -87,16 +87,18 @@ def _import_one(
         return {"status": "error", "message": f"Slide sheet parse error: {e}"}
     parsed.source_filename = slide_path.name
 
-    # Validate: must be a motor slide sheet (has at least one sliding interval).
-    # Only check when intervals were actually parsed — an empty list means the
-    # operation mode column wasn't detected (parser/format issue), not that the
-    # file has no sliding.  A non-empty list with zero sliding entries means the
-    # run is rotation-only and genuinely not a motor slide sheet.
-    if parsed.intervals and not any("slide" in iv.mode.lower() for iv in parsed.intervals):
-        return {
-            "status": "skipped",
-            "message": "Not a motor slide sheet — no sliding intervals found. Skipped.",
-        }
+    # Validate: must be a motor slide sheet (not a rotation-only run).
+    # Inverted logic: skip only when ALL parsed intervals are known rotation-only
+    # modes.  Any unrecognized mode string is treated as potentially sliding so
+    # format variants with different slide-mode labels still pass through.
+    _ROTATION_MODES = {"rotating", "rotate", "rotary", "rotation", "rot"}
+    if parsed.intervals:
+        modes_lower = {iv.mode.lower() for iv in parsed.intervals}
+        if modes_lower and modes_lower.issubset(_ROTATION_MODES):
+            return {
+                "status": "skipped",
+                "message": "Not a motor slide sheet — all intervals are rotary drilling. Skipped.",
+            }
 
     # Parse BHA config if provided
     motor_bent_deg: Optional[float] = None
