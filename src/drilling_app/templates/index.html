@@ -93,10 +93,10 @@
           <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('depth_out_ft')">
             Depth Out <span x-text="sortIcon('depth_out_ft')" class="ml-1 text-gray-400"></span>
           </th>
-          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('motor_bent_deg')">
+          <th class="table-head text-center cursor-pointer select-none hover:text-gray-700" @click="sort('motor_bent_deg')">
             Bent (°) <span x-text="sortIcon('motor_bent_deg')" class="ml-1 text-gray-400"></span>
           </th>
-          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('hole_size_in')">
+          <th class="table-head text-center cursor-pointer select-none hover:text-gray-700" @click="sort('hole_size_in')">
             Hole Size <span x-text="sortIcon('hole_size_in')" class="ml-1 text-gray-400"></span>
           </th>
           <th class="table-head text-left cursor-pointer select-none hover:text-gray-700" @click="sort('imported_at')">
@@ -112,11 +112,11 @@
             <td class="px-4 py-3 text-gray-600 text-sm group-hover:text-blue-600 transition-colors" x-text="r.bha_name || '—'"></td>
             <td class="px-4 py-3 text-right text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="r.depth_in_ft ? Math.round(r.depth_in_ft) : '—'"></td>
             <td class="px-4 py-3 text-right text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="r.depth_out_ft ? Math.round(r.depth_out_ft) : '—'"></td>
-            <td class="px-4 py-3 text-right">
+            <td class="px-4 py-3 text-center">
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800" x-show="r.motor_bent_deg" x-text="r.motor_bent_deg + '°'"></span>
               <span x-show="!r.motor_bent_deg" class="text-sm text-gray-400">—</span>
             </td>
-            <td class="px-4 py-3 text-right">
+            <td class="px-4 py-3 text-center">
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800" x-show="r.hole_size_in" x-text="r.hole_size_in + '&quot;'"></span>
               <span x-show="!r.hole_size_in" class="text-sm text-gray-400">—</span>
             </td>
