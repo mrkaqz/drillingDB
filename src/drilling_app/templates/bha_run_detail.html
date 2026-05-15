@@ -7,27 +7,84 @@
   <span>{{ run.bha_name or "BHA Run #" ~ run.id }}</span>
 </div>
 
-<!-- Header card (server-rendered, no unit conversion needed) -->
-<div class="card mb-6">
+<!-- Header card -->
+<div x-data="runHeader()" class="card mb-6">
   <div class="grid grid-cols-4 gap-6">
     <div>
       <div class="text-xs text-gray-400 uppercase">Hole Size</div>
       <div class="text-lg font-semibold">{{ run.hole_size_in or "—" }}"</div>
     </div>
+
+    <!-- Motor Bent (inline-editable) -->
     <div>
       <div class="text-xs text-gray-400 uppercase">Motor Bent</div>
-      <div class="text-lg font-semibold text-blue-700">{{ run.motor_bent_deg or "—" }}°</div>
+      <div x-show="editing !== 'motor_bent_deg'" class="flex items-center gap-2 group">
+        <span class="text-lg font-semibold text-blue-700"
+              x-text="motor_bent_deg != null ? motor_bent_deg + '°' : '—'"></span>
+        <button @click="startEdit('motor_bent_deg', motor_bent_deg)"
+                class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-all" title="Edit motor bent">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+          </svg>
+        </button>
+      </div>
+      <div x-show="editing === 'motor_bent_deg'" class="flex items-center gap-1.5 flex-wrap">
+        <input id="edit-input-motor_bent_deg" type="number" x-model="editValue"
+               step="0.01" min="0" max="5" placeholder="e.g. 1.83"
+               class="w-24 text-sm border border-blue-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+               @keydown.enter="saveEdit()" @keydown.escape="cancelEdit()">
+        <span class="text-sm text-gray-500">°</span>
+        <button @click="saveEdit()" :disabled="saving"
+                class="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">Save</button>
+        <button @click="cancelEdit()"
+                class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 transition-colors">Cancel</button>
+        <span x-show="saveError" x-text="saveError" class="text-red-500 text-xs w-full"></span>
+      </div>
     </div>
+
     <div>
       <div class="text-xs text-gray-400 uppercase">Depth In → Out</div>
       <div class="text-lg font-semibold">
         {{ "%.0f"|format(run.depth_in_ft) if run.depth_in_ft else "—" }} → {{ "%.0f"|format(run.depth_out_ft) if run.depth_out_ft else "—" }} ft
       </div>
     </div>
+
+    <!-- Motor Make / Model (inline-editable) -->
     <div>
       <div class="text-xs text-gray-400 uppercase">Motor Model</div>
-      <div class="text-sm font-medium">{{ run.motor_make or "" }} {{ run.motor_model or "—" }}</div>
+      <div x-show="editing !== 'motor_model_group'" class="flex items-center gap-2 group">
+        <span class="text-sm font-medium"
+              x-text="[motor_make, motor_model].filter(v => v).join(' ') || '—'"></span>
+        <button @click="startEditGroup()"
+                class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-all" title="Edit motor make / model">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+          </svg>
+        </button>
+      </div>
+      <div x-show="editing === 'motor_model_group'" class="space-y-1">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs text-gray-500 w-10">Make</span>
+          <input id="edit-input-motor_make" type="text" x-model="editMake" placeholder="e.g. NOV"
+                 class="text-sm border border-blue-400 rounded px-2 py-0.5 w-24 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                 @keydown.escape="cancelEdit()">
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs text-gray-500 w-10">Model</span>
+          <input type="text" x-model="editModel" placeholder="e.g. 6-7/8 5.0 Lobe"
+                 class="text-sm border border-blue-400 rounded px-2 py-0.5 w-36 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                 @keydown.escape="cancelEdit()">
+        </div>
+        <div class="flex gap-1.5 mt-1">
+          <button @click="saveGroup()" :disabled="saving"
+                  class="bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">Save</button>
+          <button @click="cancelEdit()"
+                  class="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-50 transition-colors">Cancel</button>
+        </div>
+        <span x-show="saveError" x-text="saveError" class="text-red-500 text-xs"></span>
+      </div>
     </div>
+
     <div>
       <div class="text-xs text-gray-400 uppercase">DD</div>
       <div class="text-sm">{{ run.dd_primary or "—" }}</div>
@@ -202,6 +259,86 @@
 </div><!-- end x-data -->
 
 <script>
+function runHeader() {
+  return {
+    motor_bent_deg: {{ run.motor_bent_deg | tojson }},
+    motor_make:     {{ run.motor_make | tojson }},
+    motor_model:    {{ run.motor_model | tojson }},
+    editing:    null,   // 'motor_bent_deg' | 'motor_model_group' | null
+    editValue:  '',
+    editMake:   '',
+    editModel:  '',
+    saving:     false,
+    saveError:  null,
+
+    startEdit(field, current) {
+      this.editing   = field;
+      this.editValue = current != null ? String(current) : '';
+      this.saveError = null;
+      this.$nextTick(() => {
+        const el = document.getElementById('edit-input-' + field);
+        if (el) el.focus();
+      });
+    },
+
+    startEditGroup() {
+      this.editing   = 'motor_model_group';
+      this.editMake  = this.motor_make  || '';
+      this.editModel = this.motor_model || '';
+      this.saveError = null;
+      this.$nextTick(() => {
+        const el = document.getElementById('edit-input-motor_make');
+        if (el) el.focus();
+      });
+    },
+
+    cancelEdit() {
+      this.editing   = null;
+      this.saveError = null;
+    },
+
+    async saveEdit() {
+      if (!this.editing || this.saving) return;
+      const val = this.editValue.trim() === '' ? null : parseFloat(this.editValue);
+      if (this.editValue.trim() !== '' && isNaN(val)) {
+        this.saveError = 'Enter a valid number';
+        return;
+      }
+      await this._patch({ motor_bent_deg: val });
+      if (!this.saveError) this.motor_bent_deg = val;
+    },
+
+    async saveGroup() {
+      if (this.saving) return;
+      const make  = this.editMake.trim()  || null;
+      const model = this.editModel.trim() || null;
+      await this._patch({ motor_make: make, motor_model: model });
+      if (!this.saveError) {
+        this.motor_make  = make;
+        this.motor_model = model;
+      }
+    },
+
+    async _patch(body) {
+      this.saving    = true;
+      this.saveError = null;
+      try {
+        const resp = await fetch('/api/bha-runs/{{ run.id }}', {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+        if (!resp.ok) throw new Error('Server error ' + resp.status);
+        this.editing = null;
+      } catch (e) {
+        this.saveError = 'Save failed — ' + e.message;
+      } finally {
+        this.saving = false;
+      }
+    },
+  };
+}
+
 const moData     = {{ motor_outputs_json | tojson }};
 const ivData     = {{ intervals_json | tojson }};
 

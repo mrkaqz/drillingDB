@@ -12,6 +12,7 @@ from typing import Optional
 import openpyxl
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..config import UPLOAD_DIR, DEFAULT_STAND_LENGTH_FT
@@ -109,6 +110,25 @@ def delete_run(run_id: int, db: Session = Depends(get_db)):
     db.delete(run)
     db.commit()
     return {"deleted": run_id, "well_id": well_id}
+
+
+class BhaRunPatch(BaseModel):
+    motor_bent_deg: Optional[float] = None
+    motor_make: Optional[str] = None
+    motor_model: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.patch("/{run_id}")
+def update_run(run_id: int, patch: BhaRunPatch, db: Session = Depends(get_db)):
+    """Partially update editable fields on a BHA run."""
+    run = db.query(BhaRun).filter(BhaRun.id == run_id).first()
+    if not run:
+        raise HTTPException(404, "Run not found")
+    for field, value in patch.model_dump(exclude_unset=True).items():
+        setattr(run, field, value)
+    db.commit()
+    return {"ok": True}
 
 
 def _get_or_create_well(db: Session, name: str, **kwargs) -> Well:
