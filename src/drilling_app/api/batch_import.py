@@ -87,9 +87,12 @@ def _import_one(
         return {"status": "error", "message": f"Slide sheet parse error: {e}"}
     parsed.source_filename = slide_path.name
 
-    # Validate: must be a motor slide sheet (has both rotation and sliding intervals)
-    has_sliding = any("slide" in iv.mode.lower() for iv in parsed.intervals)
-    if not has_sliding:
+    # Validate: must be a motor slide sheet (has at least one sliding interval).
+    # Only check when intervals were actually parsed — an empty list means the
+    # operation mode column wasn't detected (parser/format issue), not that the
+    # file has no sliding.  A non-empty list with zero sliding entries means the
+    # run is rotation-only and genuinely not a motor slide sheet.
+    if parsed.intervals and not any("slide" in iv.mode.lower() for iv in parsed.intervals):
         return {
             "status": "skipped",
             "message": "Not a motor slide sheet — no sliding intervals found. Skipped.",
