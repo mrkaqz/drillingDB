@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Motor Output DB{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+</div>
+
+<div class="flex flex-wrap items-center gap-4 mb-8">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex items-center gap-3 py-2.5 px-4">
+    <div class="bg-blue-50 p-1.5 rounded-lg text-blue-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+    </div>
+    <div>
+      <div class="text-xl font-black text-gray-900 leading-tight">{{ n_wells }}</div>
+      <div class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Wells</div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex items-center gap-3 py-2.5 px-4">
+    <div class="bg-green-50 p-1.5 rounded-lg text-green-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+    </div>
+    <div>
+      <div class="text-xl font-black text-gray-900 leading-tight">{{ n_runs }}</div>
+      <div class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">BHA Runs</div>
+    </div>
+  </div>
+
+  <div class="ml-auto">
+    <a href="/import" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center gap-2 px-6 py-2.5 rounded-xl shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 active:translate-y-0 hover:shadow-blue-300">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Import Slide Sheet
+    </a>
+  </div>
+</div>
+
+<div class="card" x-data="runsTable()" x-init="init()">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold text-gray-900">BHA Runs</h2>
+    <span class="text-xs text-gray-400" x-show="filtered.length < runs.length">
+      Showing <span x-text="filtered.length"></span> of <span x-text="runs.length"></span>
+    </span>
+  </div>
+
+  <!-- Search + filters -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-4">
+    <div class="relative flex-1">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+      </svg>
+      <input
+        type="text"
+        placeholder="Search by well name or BHA…"
+        x-model="search"
+        class="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+        @keydown.escape="search = ''"
+      >
+    </div>
+    <select x-model="bentFilter" class="border rounded-lg px-3 py-2 text-sm">
+      <option value="">All bent angles</option>
+      <template x-for="b in uniqueBents" :key="b">
+        <option :value="b" x-text="b + '°'"></option>
+      </template>
+    </select>
+    <select x-model="sizeFilter" class="border rounded-lg px-3 py-2 text-sm">
+      <option value="">All hole sizes</option>
+      <template x-for="s in uniqueSizes" :key="s">
+        <option :value="s" x-text="s + '&quot;'"></option>
+      </template>
+    </select>
+    <button
+      x-show="search || bentFilter || sizeFilter"
+      @click="search=''; bentFilter=''; sizeFilter=''"
+      class="text-sm text-gray-500 hover:text-gray-700 px-2 whitespace-nowrap">
+      ✕ Clear
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div x-show="filtered.length > 0" class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead>
+        <tr>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700" @click="sort('well_name')">
+            Well <span x-text="sortIcon('well_name')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700" @click="sort('bha_name')">
+            BHA <span x-text="sortIcon('bha_name')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('depth_in_ft')">
+            Depth In <span x-text="sortIcon('depth_in_ft')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('depth_out_ft')">
+            Depth Out <span x-text="sortIcon('depth_out_ft')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('motor_bent_deg')">
+            Bent (°) <span x-text="sortIcon('motor_bent_deg')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('hole_size_in')">
+            Hole Size <span x-text="sortIcon('hole_size_in')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700" @click="sort('imported_at')">
+            Imported <span x-text="sortIcon('imported_at')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head"></th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        <template x-for="r in filtered" :key="r.id">
+          <tr class="hover:bg-blue-50 cursor-pointer transition-colors group" @click="window.location.href = '/bha-runs/' + r.id">
+            <td class="px-4 py-3 font-medium text-gray-900 group-hover:text-blue-700 transition-colors" x-text="r.well_name"></td>
+            <td class="px-4 py-3 text-gray-600 text-sm group-hover:text-blue-600 transition-colors" x-text="r.bha_name || '—'"></td>
+            <td class="px-4 py-3 text-right text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="r.depth_in_ft ? Math.round(r.depth_in_ft) : '—'"></td>
+            <td class="px-4 py-3 text-right text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="r.depth_out_ft ? Math.round(r.depth_out_ft) : '—'"></td>
+            <td class="px-4 py-3 text-right">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800" x-show="r.motor_bent_deg" x-text="r.motor_bent_deg + '°'"></span>
+              <span x-show="!r.motor_bent_deg" class="text-sm text-gray-400">—</span>
+            </td>
+            <td class="px-4 py-3 text-right">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800" x-show="r.hole_size_in" x-text="r.hole_size_in + '&quot;'"></span>
+              <span x-show="!r.hole_size_in" class="text-sm text-gray-400">—</span>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap" x-text="r.imported_at"></td>
+            <td class="px-4 py-3 text-right text-gray-300">
+              <svg class="w-5 h-5 inline-block opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <div x-show="runs.length === 0" class="text-gray-500 py-4">
+    No BHA runs yet. <a href="/import" class="text-blue-600 hover:underline">Import a slide sheet</a> to get started.
+  </div>
+  <div x-show="runs.length > 0 && filtered.length === 0" class="text-gray-500 py-4">
+    No runs match your search. <button @click="search=''; bentFilter=''; sizeFilter=''" class="text-blue-600 hover:underline">Clear filters</button>
+  </div>
+</div>
+
+<script>
+const RUNS_DATA = {{ runs_json | tojson }};
+
+function runsTable() {
+  return {
+    runs: [],
+    search: '',
+    bentFilter: '',
+    sizeFilter: '',
+    sortKey: 'imported_at',
+    sortAsc: false,
+    uniqueBents: [],
+    uniqueSizes: [],
+
+    init() {
+      this.runs = RUNS_DATA;
+      this.uniqueBents = [...new Set(this.runs.map(r => r.motor_bent_deg).filter(v => v != null))].sort((a,b) => a-b);
+      this.uniqueSizes = [...new Set(this.runs.map(r => r.hole_size_in).filter(v => v != null))].sort((a,b) => a-b);
+    },
+
+    get filtered() {
+      const q = this.search.toLowerCase();
+      let rows = this.runs.filter(r => {
+        if (q && !r.well_name.toLowerCase().includes(q) && !r.bha_name.toLowerCase().includes(q)) return false;
+        if (this.bentFilter && String(r.motor_bent_deg) !== this.bentFilter) return false;
+        if (this.sizeFilter && String(r.hole_size_in) !== this.sizeFilter) return false;
+        return true;
+      });
+      const k = this.sortKey;
+      return [...rows].sort((a, b) => {
+        const av = a[k] ?? (typeof a[k] === 'number' ? -Infinity : '');
+        const bv = b[k] ?? (typeof b[k] === 'number' ? -Infinity : '');
+        const cmp = typeof av === 'number' && typeof bv === 'number'
+          ? av - bv
+          : String(av).localeCompare(String(bv));
+        return this.sortAsc ? cmp : -cmp;
+      });
+    },
+
+    sort(key) {
+      if (this.sortKey === key) { this.sortAsc = !this.sortAsc; }
+      else { this.sortKey = key; this.sortAsc = key !== 'imported_at'; }
+    },
+
+    sortIcon(key) {
+      if (this.sortKey !== key) return '↕';
+      return this.sortAsc ? '↑' : '↓';
+    },
+  }
+}
+</script>
+{% endblock %}

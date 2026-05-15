@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}BHA Config Library{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">BHA Config Library</h1>
+    <p class="text-gray-500 mt-1">Saved motor and BHA configurations. Auto-populated when importing a BHA Final report.</p>
+  </div>
+</div>
+
+<div class="card overflow-visible">
+  {% if cfg_data %}
+  <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead>
+        <tr>
+          <th class="table-head text-left">Name / BHA</th>
+          <th class="table-head text-right">Hole Size</th>
+          <th class="table-head text-right">Bent (°)</th>
+          <th class="table-head text-left">Motor Make</th>
+          <th class="table-head text-left">Motor Model</th>
+          <th class="table-head text-left">Date</th>
+          <th class="table-head text-right">Runs</th>
+          <th class="table-head"></th>
+        </tr>
+      </thead>
+      {% for item in cfg_data %}
+      {% set cfg = item.obj %}
+      <tbody class="bg-white divide-y divide-gray-100 border-b border-gray-100 last:border-0" x-data="{ open: false }">
+        <tr class="hover:bg-blue-50 cursor-pointer transition-colors group" 
+            @click="open = !open">
+          <td class="px-4 py-3 font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{{ cfg.name }}</td>
+          <td class="px-4 py-3 text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">{{ cfg.hole_size_in or "—" }}"</span>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">{{ cfg.motor_bent_deg or "—" }}°</span>
+          </td>
+          <td class="px-4 py-3 text-gray-600 group-hover:text-blue-600 transition-colors">{{ cfg.motor_make or "—" }}</td>
+          <td class="px-4 py-3 font-mono text-xs text-gray-500 group-hover:text-blue-600 transition-colors">{{ cfg.motor_model or "—" }}</td>
+          <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ cfg.bha_date.strftime("%d %b %Y") if cfg.bha_date else "—" }}</td>
+          <td class="px-4 py-3 text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">{{ cfg.bha_runs|length }}</span>
+          </td>
+          <td class="px-4 py-3 text-right text-gray-400">
+            <svg class="w-5 h-5 inline-block transition-transform duration-200" 
+                 :class="{ 'rotate-90 text-blue-600': open }"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </td>
+        </tr>
+        <tr x-show="open" class="bg-blue-50/30" x-cloak>
+          <td colspan="8" class="px-8 py-4 shadow-inner border-l-4 border-blue-400">
+            <div x-show="open" 
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0 -translate-y-2"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 class="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                <div class="flex items-center gap-2 font-bold text-blue-800 text-xs uppercase tracking-wider mb-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  Motor Specs
+                </div>
+                <div class="space-y-1 text-gray-700">
+                  <div class="flex justify-between"><span>OD:</span> <span class="font-medium">{{ cfg.motor_od_in or "—" }}"</span></div>
+                  <div class="flex justify-between"><span>Length:</span> <span class="font-medium">{{ "%.2f"|format(cfg.motor_length_ft) if cfg.motor_length_ft else "—" }} ft</span></div>
+                  <div class="flex justify-between"><span>Serial:</span> <span class="font-medium">{{ cfg.motor_serial or "—" }}</span></div>
+                  <div class="flex justify-between"><span>Bend to bit:</span> <span class="font-medium">{{ "%.2f"|format(cfg.bend_to_bit_ft) if cfg.bend_to_bit_ft else "—" }} ft</span></div>
+                </div>
+              </div>
+              
+              <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                <div class="flex items-center gap-2 font-bold text-blue-800 text-xs uppercase tracking-wider mb-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                  Sensor Offsets
+                </div>
+                <div class="space-y-1 text-gray-700">
+                  {% if item.sensor_offsets %}
+                  {% for tool, offset in item.sensor_offsets.items() %}
+                  <div class="flex justify-between"><span>{{ tool }}:</span> <span class="font-medium">{{ "%.2f"|format(offset) }} ft</span></div>
+                  {% endfor %}
+                  {% else %}
+                  <div class="text-gray-400 italic">None recorded</div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                <div class="flex items-center gap-2 font-bold text-blue-800 text-xs uppercase tracking-wider mb-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  Stabilizers
+                </div>
+                <div class="space-y-1 text-gray-700">
+                  {% if item.stabilizers %}
+                  {% for s in item.stabilizers %}
+                  <div class="flex justify-between">
+                    <span>Mid-pt to Bit:</span> 
+                    <span class="font-medium">{{ "%.2f"|format(s.mid_pt_to_bit_ft) if s.mid_pt_to_bit_ft is not none else "?" }} ft ({{ s.blade_od_in or "?" }}")</span>
+                  </div>
+                  {% endfor %}
+                  {% else %}
+                  <div class="text-gray-400 italic">None recorded</div>
+                  {% endif %}
+                </div>
+              </div>
+              
+              {% if cfg.source_filename %}
+              <div class="col-span-1 md:col-span-3 pt-2 border-t border-blue-100 text-[10px] text-gray-400 flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Original File: {{ cfg.source_filename }}
+              </div>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      </tbody>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="text-gray-500">No BHA configs yet. Upload a <strong>BHA Final.xlsx</strong> alongside a slide sheet during import to auto-create entries.</p>
+  {% endif %}
+</div>
+{% endblock %}

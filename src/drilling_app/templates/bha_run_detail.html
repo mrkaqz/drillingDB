@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+{% block title %}BHA Run #{{ run.id }} — {{ run.well.name }}{% endblock %}
+{% block content %}
+<div class="mb-4 flex items-center gap-2 text-sm text-gray-500">
+  <a href="/wells/{{ run.well_id }}" class="hover:underline text-blue-600">{{ run.well.name }}</a>
+  <span>›</span>
+  <span>{{ run.bha_name or "BHA Run #" ~ run.id }}</span>
+</div>
+
+<!-- Header card (server-rendered, no unit conversion needed) -->
+<div class="card mb-6">
+  <div class="grid grid-cols-4 gap-6">
+    <div>
+      <div class="text-xs text-gray-400 uppercase">Hole Size</div>
+      <div class="text-lg font-semibold">{{ run.hole_size_in or "—" }}"</div>
+    </div>
+    <div>
+      <div class="text-xs text-gray-400 uppercase">Motor Bent</div>
+      <div class="text-lg font-semibold text-blue-700">{{ run.motor_bent_deg or "—" }}°</div>
+    </div>
+    <div>
+      <div class="text-xs text-gray-400 uppercase">Depth In → Out</div>
+      <div class="text-lg font-semibold">
+        {{ "%.0f"|format(run.depth_in_ft) if run.depth_in_ft else "—" }} → {{ "%.0f"|format(run.depth_out_ft) if run.depth_out_ft else "—" }} ft
+      </div>
+    </div>
+    <div>
+      <div class="text-xs text-gray-400 uppercase">Motor Model</div>
+      <div class="text-sm font-medium">{{ run.motor_make or "" }} {{ run.motor_model or "—" }}</div>
+    </div>
+    <div>
+      <div class="text-xs text-gray-400 uppercase">DD</div>
+      <div class="text-sm">{{ run.dd_primary or "—" }}</div>
+    </div>
+    <div>
+      <div class="text-xs text-gray-400 uppercase">Bit</div>
+      <div class="text-sm">{{ run.bit_serial or "—" }} {{ run.bit_type or "" }}</div>
+    </div>
+    <div>
+      <div class="text-xs text-gray-400 uppercase">Date In</div>
+      <div class="text-sm">{{ run.date_in.strftime("%d %b %Y %H:%M") if run.date_in else "—" }}</div>
+    </div>
+    <div>
+      <div class="text-xs text-gray-400 uppercase">Source Units</div>
+      <div class="text-sm uppercase">{{ run.source_unit_system or "—" }}</div>
+    </div>
+  </div>
+  <div class="mt-4 flex gap-3">
+    <a href="/api/bha-runs/{{ run.id }}/export.xlsx" class="btn-secondary text-sm">Export Motor Output.xlsx</a>
+    <a href="/compare?run_ids={{ run.id }}" class="btn-secondary text-sm">Compare</a>
+  </div>
+</div>
+
+<!-- Everything below is one reactive Alpine component -->
+<div x-data="runDetail()" x-init="init()">
+
+  <!-- Controls bar -->
+  <div class="card mb-4">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div>
+        <div class="text-xs text-gray-500 mb-1">Depth unit</div>
+        <select x-model="depthUnit" class="text-sm border rounded px-2 py-1.5" @change="onDepthUnitChange()">
+          <option value="ft">Feet (ft)</option>
+          <option value="m">Meters (m)</option>
+        </select>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500 mb-1">DLS unit</div>
+        <select x-model="dlsUnit" class="text-sm border rounded px-2 py-1.5" @change="updateChart()">
+          <option value="deg/100ft">deg/100ft</option>
+          <option value="deg/30m">deg/30m</option>
+          <option value="deg/10m">deg/10m</option>
+        </select>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500 mb-1">Stand length (<span x-text="depthUnit"></span>)</div>
+        <input type="number" x-model.number="standLength" min="1" step="1"
+               class="text-sm border rounded px-2 py-1.5 w-24"
+               @change="standLength = Math.max(1, standLength || 1)">
+      </div>
+      <div class="text-xs text-gray-400 self-end pb-2">
+        Full stand = motor output × stand length
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="card mb-4">
+    <div id="mo-chart" style="height:350px;"></div>
+  </div>
+
+  <!-- Motor Output table -->
+  <div class="card mb-6 overflow-visible relative">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold">Motor Output by Survey Interval</h2>
+      <div class="text-xs text-gray-500" x-show="selectedRows.length > 0">
+        <span class="font-bold text-blue-600" x-text="selectedRows.length"></span> rows selected
+      </div>
+    </div>
+    
+    <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead>
+          <tr>
+            <th class="table-head py-2 text-center w-10 px-0">
+              <input type="checkbox" @change="toggleAll($event)" :checked="isAllSelected" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+            </th>
+            <th class="table-head py-2 text-right" x-text="'Svy MD (' + depthUnit + ')'"></th>
+            <th class="table-head py-2 text-right">Incl (°)</th>
+            <th class="table-head py-2 text-right">Azimuth (°)</th>
+            <th class="table-head py-2 text-right" x-text="'DLS (' + dlsUnit + ')'"></th>
+            <th class="table-head py-2 text-right" x-text="'Slide (' + depthUnit + ')'"></th>
+            <th class="table-head py-2 text-right" x-text="'Motor Output (°/' + depthUnit + ')'"></th>
+            <th class="table-head py-2 text-right" x-text="'Full Stand Output (' + standLength + depthUnit + ')'"></th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <template x-for="row in tableRows" :key="row.seq">
+            <tr class="transition-colors cursor-pointer"
+                :class="selectedRows.includes(String(row.seq)) ? 'bg-green-100 hover:bg-green-200' : (row.has_mo ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50')"
+                @click="toggleRow(row.seq)">
+              <td class="px-2 py-1.5 text-center" @click.stop>
+                <input type="checkbox" :value="String(row.seq)" x-model="selectedRows" class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+              </td>
+              <td class="py-1.5 px-4 text-right font-mono" x-text="fmt(row.svy_md, 1)"></td>
+              <td class="py-1.5 px-4 text-right font-mono" x-text="fmt(row.incl, 2)"></td>
+              <td class="py-1.5 px-4 text-right font-mono" x-text="fmt(row.azimuth, 2)"></td>
+              <td class="py-1.5 px-4 text-right font-mono" x-text="fmt(row.dls, 3)"></td>
+              <td class="py-1.5 px-4 text-right font-mono" x-text="row.slide != null ? fmt(row.slide, 1) : ''"></td>
+              <td class="py-1.5 px-4 text-right font-semibold text-blue-700 font-mono"
+                  x-text="row.mo_display != null ? fmt(row.mo_display, 5) : ''"></td>
+              <td class="py-1.5 px-4 text-right font-mono"
+                  x-text="row.full_stand != null ? fmt(row.full_stand, 3) : ''"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Selection Average Tooltip (Sticky Bottom) -->
+  <div x-show="selectedRows.length > 0"
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="translate-y-full opacity-0"
+       x-transition:enter-end="translate-y-0 opacity-100"
+       x-transition:leave="transition ease-in duration-200"
+       x-transition:leave-start="translate-y-0 opacity-100"
+       x-transition:leave-end="translate-y-full opacity-0"
+       class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
+    <div class="bg-blue-600 text-white rounded-2xl shadow-2xl p-4 flex items-center justify-between border border-blue-500">
+      <div class="flex items-center gap-6">
+        <div>
+          <div class="text-[10px] uppercase font-bold text-blue-100 tracking-wider">Avg Motor Output</div>
+          <div class="text-xl font-black">
+            <span x-text="selectionAverageMO"></span>
+            <span class="text-xs font-normal text-blue-100" x-text="'°/' + depthUnit"></span>
+          </div>
+        </div>
+        <div class="h-8 w-px bg-blue-400"></div>
+        <div>
+          <div class="text-[10px] uppercase font-bold text-blue-100 tracking-wider">Avg Full Stand</div>
+          <div class="text-xl font-black">
+            <span x-text="selectionAverageFS"></span>
+            <span class="text-xs font-normal text-blue-100" x-text="'°'"></span>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-medium bg-blue-700 px-2 py-1 rounded" x-text="selectedRows.length + ' rows'"></span>
+        <button @click="selectedRows = []" class="bg-white text-blue-600 hover:bg-blue-50 transition-colors px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
+          Clear
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide / Rotate summary -->
+  <div class="card">
+    <h2 class="text-lg font-semibold mb-4">Slide / Rotate Intervals</h2>
+    <div class="grid grid-cols-3 gap-4 mb-4 text-sm">
+      <div class="bg-orange-50 rounded p-3">
+        <div class="text-orange-700 font-semibold">Sliding</div>
+        <div class="text-2xl font-bold text-orange-800">
+          <span x-text="fmt(slideTotalDisplay, 0)"></span>
+          <span x-text="depthUnit" class="text-base font-normal"></span>
+        </div>
+      </div>
+      <div class="bg-green-50 rounded p-3">
+        <div class="text-green-700 font-semibold">Rotating</div>
+        <div class="text-2xl font-bold text-green-800">
+          <span x-text="fmt(rotateTotalDisplay, 0)"></span>
+          <span x-text="depthUnit" class="text-base font-normal"></span>
+        </div>
+      </div>
+      <div class="bg-gray-50 rounded p-3">
+        <div class="text-gray-700 font-semibold">Slide %</div>
+        <div class="text-2xl font-bold text-gray-800" x-text="slidePct > 0 ? fmt(slidePct, 0) + '%' : '—'"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end x-data -->
+
+<script>
+const moData     = {{ motor_outputs_json | tojson }};
+const ivData     = {{ intervals_json | tojson }};
+
+const M_TO_FT    = 3.28084;
+// Convert FROM deg/100ft TO display unit (divide by the _TO_100FT factor)
+const DLS_30M_FACTOR = 1 / 1.01601;   // deg/100ft → deg/30m
+const DLS_10M_FACTOR = 1 / 3.04803;   // deg/100ft → deg/10m
+
+function runDetail() {
+  return {
+    depthUnit:  'ft',
+    dlsUnit:    'deg/100ft',
+    standLength: 100,
+    selectedRows: [],
+
+    init() {
+      this.$nextTick(() => this.updateChart());
+    },
+
+    fmt(v, decimals) {
+      if (v == null || isNaN(v)) return '';
+      return v.toFixed(decimals);
+    },
+
+    toggleRow(seq) {
+      const s = String(seq);
+      if (this.selectedRows.includes(s)) {
+        this.selectedRows = this.selectedRows.filter(v => v !== s);
+      } else {
+        this.selectedRows.push(s);
+      }
+    },
+
+    toggleAll(event) {
+      if (event.target.checked) {
+        this.selectedRows = this.tableRows.map(r => String(r.seq));
+      } else {
+        this.selectedRows = [];
+      }
+    },
+
+    get isAllSelected() {
+      return this.selectedRows.length === this.tableRows.length && this.tableRows.length > 0;
+    },
+
+    get selectionAverageMO() {
+      const selected = this.tableRows.filter(r => this.selectedRows.includes(String(r.seq)) && r.mo_display != null);
+      if (selected.length === 0) return '0.00000';
+      const sum = selected.reduce((s, r) => s + r.mo_display, 0);
+      return this.fmt(sum / selected.length, 5);
+    },
+
+    get selectionAverageFS() {
+      const selected = this.tableRows.filter(r => this.selectedRows.includes(String(r.seq)) && r.full_stand != null);
+      if (selected.length === 0) return '0.000';
+      const sum = selected.reduce((s, r) => s + r.full_stand, 0);
+      return this.fmt(sum / selected.length, 3);
+    },
+
+    // Called when depth unit dropdown changes
+    onDepthUnitChange() {
+      this.standLength = this.depthUnit === 'm' ? 30 : 100;
+      this.updateChart();
+    },
+
+    // Reactive computed rows for the table
+    get tableRows() {
+      const d_f  = this.depthUnit === 'm' ? 1 / M_TO_FT : 1;
+      const dls_f = this.dlsUnit === 'deg/10m' ? DLS_10M_FACTOR :
+                    this.dlsUnit === 'deg/30m' ? DLS_30M_FACTOR : 1;
+      const mo_f = this.depthUnit === 'm' ? M_TO_FT : 1;
+      // stand length is in display unit; convert to ft for full-stand calc
+      const stand_ft = this.depthUnit === 'm' ? this.standLength * M_TO_FT : this.standLength;
+
+      return moData.map((r, i) => ({
+        seq:        i,
+        svy_md:     r.svy_md_ft * d_f,
+        incl:       r.incl_deg,
+        azimuth:    r.azmth_deg,
+        dls:        r.dls_deg_per_100ft * dls_f,
+        slide:      r.slide_footage_ft != null ? r.slide_footage_ft * d_f : null,
+        mo_display: r.motor_output_deg_per_ft != null ? r.motor_output_deg_per_ft * mo_f : null,
+        full_stand: r.motor_output_deg_per_ft != null ? r.motor_output_deg_per_ft * stand_ft : null,
+        has_mo:     r.motor_output_deg_per_ft != null,
+      }));
+    },
+
+    // Slide / Rotate totals from interval data (always in ft)
+    get slideTotal()  { return ivData.filter(iv => iv.mode === 'Sliding').reduce((s,iv) => s + iv.md_to_ft - iv.md_from_ft, 0); },
+    get rotateTotal() { return ivData.filter(iv => iv.mode === 'Rotating').reduce((s,iv) => s + iv.md_to_ft - iv.md_from_ft, 0); },
+    get slideTotalDisplay()  { return this.depthUnit === 'm' ? this.slideTotal  / M_TO_FT : this.slideTotal; },
+    get rotateTotalDisplay() { return this.depthUnit === 'm' ? this.rotateTotal / M_TO_FT : this.rotateTotal; },
+    get slidePct() {
+      const t = this.slideTotal + this.rotateTotal;
+      return t > 0 ? 100 * this.slideTotal / t : 0;
+    },
+
+    updateChart() {
+      const d_f   = this.depthUnit === 'm' ? 1 / M_TO_FT : 1;
+      const dls_f = this.dlsUnit === 'deg/10m' ? DLS_10M_FACTOR :
+                    this.dlsUnit === 'deg/30m' ? DLS_30M_FACTOR : 1;
+      const mo_f  = this.depthUnit === 'm' ? M_TO_FT : 1;
+
+      const chartRows = moData.filter(r => r.motor_output_deg_per_ft != null);
+      const x    = chartRows.map(r => r.svy_md_ft * d_f);
+      const y_mo = chartRows.map(r => r.motor_output_deg_per_ft * mo_f);
+      const y_dls = chartRows.map(r => r.dls_deg_per_100ft * dls_f);
+
+      const shapes = [];
+      ivData.filter(iv => iv.mode === 'Sliding').forEach(iv => {
+        shapes.push({
+          type: 'rect', xref: 'x', yref: 'paper',
+          x0: iv.md_from_ft * d_f, x1: iv.md_to_ft * d_f,
+          y0: 0, y1: 1,
+          fillcolor: 'rgba(255,165,0,0.12)', line: { width: 0 },
+        });
+      });
+
+      const depthUnit = this.depthUnit;
+      const dlsUnit   = this.dlsUnit;
+      Plotly.newPlot('mo-chart', [
+        {
+          x, y: y_mo,
+          name: `Motor Output (°/${depthUnit})`,
+          type: 'bar',
+          marker: { color: 'rgba(59,130,246,0.7)' },
+          yaxis: 'y',
+        },
+        {
+          x, y: y_dls,
+          name: `DLS (${dlsUnit})`,
+          type: 'scatter', mode: 'lines+markers',
+          marker: { size: 5 },
+          line: { color: 'rgba(239,68,68,0.9)', width: 2 },
+          yaxis: 'y2',
+        },
+      ], {
+        shapes,
+        xaxis:  { title: `MD (${depthUnit})` },
+        yaxis:  { title: `Motor Output (°/${depthUnit})`, side: 'left' },
+        yaxis2: { title: `DLS (${dlsUnit})`, side: 'right', overlaying: 'y' },
+        legend: { orientation: 'h', y: 1.1 },
+        margin: { t: 20, l: 60, r: 60, b: 50 },
+        height: 330,
+      });
+    },
+  }
+}
+</script>
+{% endblock %}

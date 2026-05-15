@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Batch Import{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Batch Import</h1>
+  <p class="text-gray-500 mt-1">Scan a folder for slide sheets and BHA config files, preview pairings, then import all at once.</p>
+</div>
+
+<div x-data="batchImport()" x-cloak>
+
+  <!-- Folder settings card -->
+  <div class="card mb-6">
+    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Folder Settings</h2>
+    <div class="grid grid-cols-1 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Source Folder <span class="text-red-500">*</span></label>
+        <input type="text" x-model="folder" placeholder="e.g. C:\Users\...\batch import"
+               class="w-full border rounded px-3 py-2 text-sm font-mono focus:ring-blue-500 focus:border-blue-500">
+        <p class="text-xs text-gray-400 mt-1">Full path to the folder containing slide sheets and BHA Final reports.</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Done Folder <span class="text-gray-400 font-normal">(optional)</span></label>
+        <input type="text" x-model="doneFolder" placeholder="Leave blank to use source folder\imported"
+               class="w-full border rounded px-3 py-2 text-sm font-mono">
+        <p class="text-xs text-gray-400 mt-1">Successfully imported files will be moved here. Defaults to a subfolder called <code>imported</code> inside the source folder.</p>
+      </div>
+      <div class="max-w-xs">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Stand Length (ft)</label>
+        <input type="number" x-model.number="standLength" min="1" step="1"
+               class="w-full border rounded px-3 py-2 text-sm">
+      </div>
+    </div>
+    <div class="flex gap-3">
+      <button @click="preview()" :disabled="scanning || !folder.trim()"
+              class="btn-secondary text-sm">
+        <span x-show="!scanning">Scan Folder</span>
+        <span x-show="scanning">Scanning…</span>
+      </button>
+    </div>
+    <div x-show="scanError" class="mt-3 text-sm text-red-600" x-text="scanError"></div>
+  </div>
+
+  <!-- Preview card -->
+  <div class="card mb-6" x-show="groups.length > 0">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold">
+        Found <span x-text="groups.length"></span> well group<span x-show="groups.length !== 1">s</span>
+      </h2>
+      <button @click="runImport()" :disabled="importing || groups.filter(g => g.can_import).length === 0"
+              class="btn-primary text-sm">
+        <span x-show="!importing">Import All (<span x-text="groups.filter(g => g.can_import).length"></span> wells)</span>
+        <span x-show="importing">Importing…</span>
+      </button>
+    </div>
+
+    <div class="overflow-x-auto border border-gray-200 rounded-lg">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead>
+          <tr>
+            <th class="table-head text-left">Well Group</th>
+            <th class="table-head text-left">Slide Sheet</th>
+            <th class="table-head text-left">BHA Config</th>
+            <th class="table-head text-center">Ready</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <template x-for="g in groups" :key="g.key">
+            <tr :class="g.can_import ? 'bg-white' : 'bg-yellow-50'">
+              <td class="px-4 py-3 font-medium text-gray-900" x-text="g.key"></td>
+              <td class="px-4 py-3 text-gray-600 text-xs font-mono" x-text="g.slide_file || '—'"></td>
+              <td class="px-4 py-3 text-gray-600 text-xs font-mono">
+                <span x-show="g.bha_file" x-text="g.bha_file" class="text-green-700"></span>
+                <span x-show="!g.bha_file" class="text-gray-400">No BHA file (motor details manual)</span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span x-show="g.can_import" class="text-green-600 font-bold">✓</span>
+                <span x-show="!g.can_import" class="text-yellow-600 font-bold">⚠</span>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <p x-show="groups.some(g => !g.can_import)" class="text-xs text-yellow-700 mt-2">
+      ⚠ Groups without a slide sheet will be skipped.
+    </p>
+  </div>
+
+  <!-- Results card -->
+  <div class="card" x-show="results.length > 0">
+    <h2 class="text-lg font-semibold mb-1">Import Results</h2>
+    <p class="text-sm text-gray-500 mb-4">
+      Imported files moved to: <code class="bg-gray-100 px-1 rounded" x-text="doneResult"></code>
+    </p>
+
+    <div class="overflow-x-auto border border-gray-200 rounded-lg">
+      <table class="min-w-full divide-y divide-gray-200 text-sm">
+        <thead>
+          <tr>
+            <th class="table-head text-left">Well</th>
+            <th class="table-head text-left">Slide Sheet</th>
+            <th class="table-head text-left">BHA Config</th>
+            <th class="table-head text-center">Status</th>
+            <th class="table-head text-left">Detail</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-100">
+          <template x-for="r in results" :key="r.key">
+            <tr :class="r.status === 'ok' ? 'bg-green-50' : r.status === 'skipped' ? 'bg-yellow-50' : 'bg-red-50'">
+              <td class="px-4 py-3 font-medium">
+                <a x-show="r.well_id" :href="'/wells/' + r.well_id" class="text-blue-600 hover:underline" x-text="r.well_name || r.key"></a>
+                <span x-show="!r.well_id" x-text="r.key"></span>
+              </td>
+              <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.slide_file || '—'"></td>
+              <td class="px-4 py-3 text-xs font-mono text-gray-600" x-text="r.bha_file || '—'"></td>
+              <td class="px-4 py-3 text-center font-semibold">
+                <span x-show="r.status === 'ok'" class="text-green-700">Imported</span>
+                <span x-show="r.status === 'skipped'" class="text-yellow-700">Skipped</span>
+                <span x-show="r.status === 'error'" class="text-red-700">Error</span>
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-600" x-text="r.message"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-4 flex gap-3">
+      <a href="/" class="btn-primary text-sm">View Dashboard</a>
+      <button @click="reset()" class="btn-secondary text-sm">Import Another Folder</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function batchImport() {
+  return {
+    folder:      {{ default_folder | tojson }},
+    doneFolder:  '',
+    standLength: 100,
+    scanning:    false,
+    importing:   false,
+    scanError:   '',
+    groups:      [],
+    results:     [],
+    doneResult:  '',
+
+    async preview() {
+      this.scanError = '';
+      this.groups = [];
+      this.results = [];
+      this.scanning = true;
+      try {
+        const resp = await fetch('/api/batch/preview?folder=' + encodeURIComponent(this.folder));
+        const data = await resp.json();
+        if (data.error) { this.scanError = data.error; return; }
+        this.groups = data.groups;
+        if (this.groups.length === 0) this.scanError = 'No Excel files found in this folder.';
+      } catch (e) {
+        this.scanError = String(e);
+      } finally {
+        this.scanning = false;
+      }
+    },
+
+    async runImport() {
+      this.importing = true;
+      this.results = [];
+      try {
+        const fd = new FormData();
+        fd.append('folder', this.folder);
+        fd.append('done_folder', this.doneFolder);
+        fd.append('stand_length_ft', this.standLength);
+        const resp = await fetch('/api/batch/import', { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (data.error) { alert(data.error); return; }
+        this.results = data.results;
+        this.doneResult = data.done_folder;
+        this.groups = []; // hide preview once results are shown
+      } catch (e) {
+        alert('Batch import failed: ' + e);
+      } finally {
+        this.importing = false;
+      }
+    },
+
+    reset() {
+      this.groups = [];
+      this.results = [];
+      this.doneResult = '';
+      this.scanError = '';
+    },
+  }
+}
+</script>
+{% endblock %}

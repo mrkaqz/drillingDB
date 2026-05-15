@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Benchmarks{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Motor Output Benchmarks</h1>
+  <p class="text-gray-500 mt-1">Aggregated performance statistics grouped by bent angle, hole size, and motor model.</p>
+</div>
+
+{% if not rows %}
+<div class="card text-gray-500">No data yet — import slide sheets to see benchmarks.</div>
+{% else %}
+
+<!-- Summary cards -->
+<div class="grid grid-cols-4 gap-4 mb-6">
+  <div class="card text-center">
+    <div class="text-3xl font-bold text-blue-700">{{ n_configs }}</div>
+    <div class="text-sm text-gray-500 mt-1">Unique Configurations</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-3xl font-bold text-gray-800">{{ n_runs }}</div>
+    <div class="text-sm text-gray-500 mt-1">Total Runs</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-3xl font-bold text-gray-800">{{ bent_angles|length }}</div>
+    <div class="text-sm text-gray-500 mt-1">Bent Angles</div>
+  </div>
+  <div class="card text-center">
+    <div class="text-3xl font-bold text-gray-800">{{ hole_sizes|length }}</div>
+    <div class="text-sm text-gray-500 mt-1">Hole Sizes</div>
+  </div>
+</div>
+
+<!-- Charts -->
+<div class="grid grid-cols-2 gap-6 mb-6">
+  <div class="card">
+    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Avg Motor Output by Bent Angle</h2>
+    <div id="chart-bent" style="height:300px;"></div>
+  </div>
+  <div class="card">
+    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Motor Output Distribution</h2>
+    <div id="chart-scatter" style="height:300px;"></div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+  <h2 class="text-lg font-semibold mb-4">Configuration Breakdown</h2>
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead>
+        <tr>
+          <th class="table-head py-2 text-right">Bent (°)</th>
+          <th class="table-head py-2 text-right">Hole Size</th>
+          <th class="table-head py-2 text-left">Motor Model</th>
+          <th class="table-head py-2 text-right">Runs</th>
+          <th class="table-head py-2 text-right">Avg MO (°/ft)</th>
+          <th class="table-head py-2 text-right">Median MO (°/ft)</th>
+          <th class="table-head py-2 text-right">P90 MO (°/ft)</th>
+          <th class="table-head py-2 text-right">Avg Full Stand (°)</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for row in rows %}
+        <tr class="hover:bg-gray-50">
+          <td class="py-2 text-right font-semibold text-blue-700">{{ row.motor_bent_deg or "—" }}</td>
+          <td class="py-2 text-right">{{ row.hole_size_in or "—" }}"</td>
+          <td class="py-2">{{ row.motor_model or "—" }}</td>
+          <td class="py-2 text-right">{{ row.run_count }}</td>
+          <td class="py-2 text-right font-mono">{{ "%.5f"|format(row.avg_motor_output) if row.avg_motor_output else "—" }}</td>
+          <td class="py-2 text-right font-mono">{{ "%.5f"|format(row.median_motor_output) if row.median_motor_output else "—" }}</td>
+          <td class="py-2 text-right font-mono">{{ "%.5f"|format(row.p90_motor_output) if row.p90_motor_output else "—" }}</td>
+          <td class="py-2 text-right font-mono">{{ "%.3f"|format(row.avg_full_stand) if row.avg_full_stand else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const benchData = {{ rows | tojson }};
+
+// Bar chart: avg motor output by bent angle (group by bent_deg)
+const byBent = {};
+benchData.forEach(r => {
+  const key = r.motor_bent_deg ?? 'Unknown';
+  if (!byBent[key]) byBent[key] = { total: 0, count: 0 };
+  if (r.avg_motor_output) {
+    byBent[key].total += r.avg_motor_output * r.run_count;
+    byBent[key].count += r.run_count;
+  }
+});
+const bentLabels = Object.keys(byBent).sort();
+const bentVals = bentLabels.map(k => byBent[k].count > 0 ? byBent[k].total / byBent[k].count : 0);
+
+Plotly.newPlot('chart-bent', [{
+  x: bentLabels.map(l => l + '°'),
+  y: bentVals,
+  type: 'bar',
+  marker: { color: 'rgba(59,130,246,0.7)' },
+  text: bentVals.map(v => v.toFixed(5)),
+  textposition: 'outside',
+}], {
+  xaxis: { title: 'Bent Angle (°)' },
+  yaxis: { title: 'Avg Motor Output (°/ft)' },
+  margin: { t: 10, l: 70, r: 20, b: 50 },
+  height: 270,
+});
+
+// Scatter: avg_motor_output vs motor_bent_deg, color by hole_size
+const scatterTraces = {};
+benchData.forEach(r => {
+  const size = r.hole_size_in ?? 'Unknown';
+  if (!scatterTraces[size]) scatterTraces[size] = { x: [], y: [], text: [] };
+  if (r.avg_motor_output && r.motor_bent_deg) {
+    scatterTraces[size].x.push(r.motor_bent_deg);
+    scatterTraces[size].y.push(r.avg_motor_output);
+    scatterTraces[size].text.push(r.motor_model || '');
+  }
+});
+const scatterPlots = Object.entries(scatterTraces).map(([size, d]) => ({
+  x: d.x, y: d.y, text: d.text,
+  mode: 'markers',
+  type: 'scatter',
+  name: size + '"',
+  marker: { size: 10 },
+  hovertemplate: '%{text}<br>Bent: %{x}°<br>MO: %{y:.5f}<extra></extra>',
+}));
+
+Plotly.newPlot('chart-scatter', scatterPlots, {
+  xaxis: { title: 'Bent Angle (°)' },
+  yaxis: { title: 'Avg Motor Output (°/ft)' },
+  legend: { orientation: 'h', y: 1.1 },
+  margin: { t: 20, l: 70, r: 20, b: 50 },
+  height: 270,
+});
+</script>
+{% endif %}
+{% endblock %}

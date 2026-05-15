@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ well.name }}{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-start justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">{{ well.name }}</h1>
+    <div class="flex gap-4 mt-1 text-sm text-gray-500">
+      {% if well.field %}<span>Field: {{ well.field }}</span>{% endif %}
+      {% if well.borehole %}<span>Borehole: {{ well.borehole }}</span>{% endif %}
+      {% if well.rig %}<span>Rig: {{ well.rig }}</span>{% endif %}
+      {% if well.client %}<span>Client: {{ well.client }}</span>{% endif %}
+    </div>
+  </div>
+  <button onclick="confirmDeleteWell({{ well.id }}, '{{ well.name | e }}')"
+          class="btn-danger text-sm">
+    Delete Well
+  </button>
+</div>
+
+<div class="card">
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-lg font-semibold">BHA Runs ({{ runs|length }})</h2>
+    <a href="/import" class="btn-primary text-sm">+ Add Run</a>
+  </div>
+  {% if runs %}
+  <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead>
+        <tr>
+          <th class="table-head text-left">BHA Name</th>
+          <th class="table-head text-right">Bent (°)</th>
+          <th class="table-head text-right">Hole Size</th>
+          <th class="table-head text-right">Depth In (ft)</th>
+          <th class="table-head text-right">Depth Out (ft)</th>
+          <th class="table-head text-left">Motor Model</th>
+          <th class="table-head text-left">Date In</th>
+          <th class="table-head"></th>
+          <th class="table-head"></th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for run in runs %}
+        <tr class="hover:bg-blue-50 cursor-pointer transition-colors group" onclick="window.location.href='/bha-runs/{{ run.id }}'">
+          <td class="px-4 py-3 font-medium text-gray-900">{{ run.bha_name or "Run #" ~ run.id }}</td>
+          <td class="px-4 py-3 text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800"
+                  {% if run.motor_bent_deg %} title="{{ run.motor_bent_deg }}°" {% endif %}>
+              {{ run.motor_bent_deg or "—" }}{% if run.motor_bent_deg %}°{% endif %}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-right">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+              {{ run.hole_size_in or "—" }}{% if run.hole_size_in %}"{% endif %}
+            </span>
+          </td>
+          <td class="px-4 py-3 text-right text-gray-600">{{ "%.0f"|format(run.depth_in_ft) if run.depth_in_ft else "—" }}</td>
+          <td class="px-4 py-3 text-right text-gray-600">{{ "%.0f"|format(run.depth_out_ft) if run.depth_out_ft else "—" }}</td>
+          <td class="px-4 py-3 text-gray-600">{{ run.motor_model or "—" }}</td>
+          <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{{ run.date_in.strftime("%d %b %Y") if run.date_in else "—" }}</td>
+          <td class="px-4 py-3 text-right text-gray-300">
+            <svg class="w-5 h-5 inline-block opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </td>
+          <td class="px-4 py-3 text-right whitespace-nowrap" onclick="event.stopPropagation()">
+            <button onclick="confirmDeleteRun({{ run.id }}, '{{ (run.bha_name or 'Run #' ~ run.id) | e }}')"
+                    class="text-red-400 hover:text-red-600 transition-colors p-1" title="Delete Run">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-gray-500">No BHA runs for this well yet.</p>
+  {% endif %}
+</div>
+
+<!-- Delete confirmation modal -->
+<div id="delete-modal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
+    <h3 class="text-lg font-semibold text-gray-900 mb-2" id="modal-title">Confirm Delete</h3>
+    <p class="text-sm text-gray-600 mb-5" id="modal-body"></p>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeModal()" class="btn-secondary text-sm">Cancel</button>
+      <button id="modal-confirm" class="btn-danger text-sm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _modalAction = null;
+
+function showModal(title, body, onConfirm) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent = body;
+  _modalAction = onConfirm;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('delete-modal').classList.add('hidden');
+  _modalAction = null;
+}
+
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  if (_modalAction) _modalAction();
+  closeModal();
+});
+
+function confirmDeleteWell(wellId, wellName) {
+  showModal(
+    'Delete Well',
+    `Delete "${wellName}" and ALL its BHA runs, surveys, and motor output data? This cannot be undone.`,
+    async () => {
+      const resp = await fetch(`/api/bha-runs/wells/${wellId}`, { method: 'DELETE' });
+      if (resp.ok) { window.location.href = '/wells'; }
+      else { alert('Delete failed: ' + (await resp.text())); }
+    }
+  );
+}
+
+function confirmDeleteRun(runId, runName) {
+  showModal(
+    'Delete BHA Run',
+    `Delete "${runName}" and all its survey and motor output data? This cannot be undone.`,
+    async () => {
+      const resp = await fetch(`/api/bha-runs/${runId}`, { method: 'DELETE' });
+      if (resp.ok) { window.location.reload(); }
+      else { alert('Delete failed: ' + (await resp.text())); }
+    }
+  );
+}
+</script>
+{% endblock %}

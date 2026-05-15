@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Wells{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Wells</h1>
+  <a href="/import" class="btn-primary">+ Import Slide Sheet</a>
+</div>
+
+<div class="card" x-data="wellsTable()" x-init="init()">
+
+  <!-- Search + stats row -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-4">
+    <div class="relative flex-1">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
+      </svg>
+      <input
+        type="text"
+        placeholder="Search wells, field, rig, client…"
+        x-model="search"
+        class="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+        @keydown.escape="search = ''"
+      >
+    </div>
+    <div class="flex gap-2 items-center">
+      <select x-model="fieldFilter" class="border rounded-lg px-3 py-2 text-sm">
+        <option value="">All fields</option>
+        <template x-for="f in uniqueFields" :key="f">
+          <option :value="f" x-text="f"></option>
+        </template>
+      </select>
+      <select x-model="rigFilter" class="border rounded-lg px-3 py-2 text-sm">
+        <option value="">All rigs</option>
+        <template x-for="r in uniqueRigs" :key="r">
+          <option :value="r" x-text="r"></option>
+        </template>
+      </select>
+    </div>
+  </div>
+
+  <!-- Result count -->
+  <p class="text-xs text-gray-400 mb-3" x-show="search || fieldFilter || rigFilter">
+    Showing <span x-text="filtered.length"></span> of <span x-text="wells.length"></span> wells
+    <button @click="search=''; fieldFilter=''; rigFilter=''" class="ml-2 text-blue-500 hover:underline">Clear filters</button>
+  </p>
+
+  <!-- Table -->
+  <div x-show="filtered.length > 0" class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead>
+        <tr>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
+              @click="sort('name')">
+            Well Name
+            <span x-text="sortIcon('name')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
+              @click="sort('field')">
+            Field
+            <span x-text="sortIcon('field')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
+              @click="sort('borehole')">
+            Borehole
+            <span x-text="sortIcon('borehole')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
+              @click="sort('rig')">
+            Rig
+            <span x-text="sortIcon('rig')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
+              @click="sort('client')">
+            Client
+            <span x-text="sortIcon('client')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700"
+              @click="sort('run_count')">
+            BHA Runs
+            <span x-text="sortIcon('run_count')" class="ml-1 text-gray-400"></span>
+          </th>
+          <th class="table-head"></th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        <template x-for="w in filtered" :key="w.id">
+          <tr class="hover:bg-blue-50 cursor-pointer transition-colors group" @click="window.location.href = '/wells/' + w.id">
+            <td class="px-4 py-3 font-medium text-gray-900 group-hover:text-blue-700 transition-colors" x-text="w.name"></td>
+            <td class="px-4 py-3 text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="w.field || '—'"></td>
+            <td class="px-4 py-3 text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="w.borehole || '—'"></td>
+            <td class="px-4 py-3 text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="w.rig || '—'"></td>
+            <td class="px-4 py-3 text-sm text-gray-600 group-hover:text-blue-600 transition-colors" x-text="w.client || '—'"></td>
+            <td class="px-4 py-3 text-right">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800" x-text="w.run_count"></span>
+            </td>
+            <td class="px-4 py-3 text-right text-gray-300">
+              <svg class="w-5 h-5 inline-block opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Empty state -->
+  <div x-show="wells.length === 0" class="text-gray-500 py-4">
+    No wells yet. <a href="/import" class="text-blue-600 hover:underline">Import a slide sheet</a> to get started.
+  </div>
+  <div x-show="wells.length > 0 && filtered.length === 0" class="text-gray-500 py-4">
+    No wells match your search. <button @click="search=''; fieldFilter=''; rigFilter=''" class="text-blue-600 hover:underline">Clear filters</button>
+  </div>
+
+</div>
+
+<script>
+const WELLS_DATA = {{ wells_json | tojson }};
+
+function wellsTable() {
+  return {
+    wells: [],
+    search: '',
+    fieldFilter: '',
+    rigFilter: '',
+    sortKey: 'name',
+    sortAsc: true,
+    uniqueFields: [],
+    uniqueRigs: [],
+
+    init() {
+      this.wells = WELLS_DATA;
+      this.uniqueFields = [...new Set(this.wells.map(w => w.field).filter(Boolean))].sort();
+      this.uniqueRigs   = [...new Set(this.wells.map(w => w.rig).filter(Boolean))].sort();
+    },
+
+    get filtered() {
+      const q = this.search.toLowerCase();
+      let rows = this.wells.filter(w => {
+        if (q && !['name','field','borehole','rig','client'].some(k => w[k].toLowerCase().includes(q))) return false;
+        if (this.fieldFilter && w.field !== this.fieldFilter) return false;
+        if (this.rigFilter  && w.rig   !== this.rigFilter)   return false;
+        return true;
+      });
+      const k = this.sortKey;
+      rows = [...rows].sort((a, b) => {
+        const av = typeof a[k] === 'number' ? a[k] : (a[k] || '').toLowerCase();
+        const bv = typeof b[k] === 'number' ? b[k] : (b[k] || '').toLowerCase();
+        if (av < bv) return this.sortAsc ? -1 : 1;
+        if (av > bv) return this.sortAsc ?  1 : -1;
+        return 0;
+      });
+      return rows;
+    },
+
+    sort(key) {
+      if (this.sortKey === key) {
+        this.sortAsc = !this.sortAsc;
+      } else {
+        this.sortKey = key;
+        this.sortAsc = true;
+      }
+    },
+
+    sortIcon(key) {
+      if (this.sortKey !== key) return '↕';
+      return this.sortAsc ? '↑' : '↓';
+    },
+  }
+}
+</script>
+{% endblock %}

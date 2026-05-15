@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Database (live data — do not commit)
+drilling.db
+*.db-shm
+*.db-wal
+
+# Uploaded & generated files
+uploads/
+exports/
+
+# Test cache
+.pytest_cache/
+
+# Local env / secrets
+.env
+.env.*
+
+# Windows
+Thumbs.db
+desktop.ini

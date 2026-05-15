@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% block title %}Import Slide Sheet{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <h1 class="text-2xl font-bold text-gray-900">Import Slide Sheet</h1>
+  <p class="text-gray-500 mt-1">Upload a DOX Slide Sheet or SLB Steering Sheet. Optionally attach the BHA Final report to auto-fill motor configuration.</p>
+</div>
+
+<div class="card max-w-2xl" x-data="importForm()" x-cloak>
+  <form id="import-form" method="post" action="/api/bha-runs/import" enctype="multipart/form-data"
+        @submit.prevent="submitForm">
+
+    <!-- File uploads -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        Slide Sheet / Steering Sheet <span class="text-red-500">*</span>
+      </label>
+      <input type="file" name="slide_file" accept=".xlsx,.xls" required
+             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+             @change="slideChanged($event)">
+      <p class="text-xs mt-1" :class="slideLoading ? 'text-blue-500' : 'text-gray-400'" x-text="slideInfo"></p>
+    </div>
+
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-1">
+        BHA Config Final Report
+        <span class="text-gray-400 font-normal">(optional — auto-fills motor bent angle &amp; model)</span>
+      </label>
+      <input type="file" name="bha_file" accept=".xlsx,.xls"
+             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+             @change="bhaChanged($event)">
+      <p class="text-xs mt-1" :class="bhaLoading ? 'text-blue-500' : (hasBhaFile ? 'text-green-600 font-medium' : 'text-gray-400')" x-text="bhaInfo"></p>
+    </div>
+
+    <hr class="my-6">
+
+    <!-- Well info -->
+    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Well Information</h3>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Well Name <span class="text-red-500">*</span>
+          <span x-show="autoFilled.wellName"
+                class="ml-1 text-xs font-normal text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
+                x-text="'auto-filled from ' + autoFilled.wellName"></span>
+        </label>
+        <input type="text" name="well_name" x-model="wellName"
+               :class="autoFilled.wellName
+                 ? 'w-full border border-blue-300 bg-blue-50 rounded px-3 py-2 text-sm'
+                 : 'w-full border rounded px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500'"
+               placeholder="e.g. Nong Yao A-45H">
+        <p class="text-xs text-gray-400 mt-1" x-show="!autoFilled.wellName">Will be detected from slide sheet automatically.</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Field
+          <span x-show="autoFilled.field"
+                class="ml-1 text-xs font-normal text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
+                x-text="'auto-filled from ' + autoFilled.field"></span>
+        </label>
+        <input type="text" name="field" x-model="field"
+               :class="autoFilled.field
+                 ? 'w-full border border-blue-300 bg-blue-50 rounded px-3 py-2 text-sm'
+                 : 'w-full border rounded px-3 py-2 text-sm'">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Rig
+          <span x-show="autoFilled.rig"
+                class="ml-1 text-xs font-normal text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
+                x-text="'auto-filled from ' + autoFilled.rig"></span>
+        </label>
+        <input type="text" name="rig" x-model="rig"
+               :class="autoFilled.rig
+                 ? 'w-full border border-blue-300 bg-blue-50 rounded px-3 py-2 text-sm'
+                 : 'w-full border rounded px-3 py-2 text-sm'">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Client
+          <span x-show="autoFilled.client"
+                class="ml-1 text-xs font-normal text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
+                x-text="'auto-filled from ' + autoFilled.client"></span>
+        </label>
+        <input type="text" name="client" x-model="client"
+               :class="autoFilled.client
+                 ? 'w-full border border-blue-300 bg-blue-50 rounded px-3 py-2 text-sm'
+                 : 'w-full border rounded px-3 py-2 text-sm'">
+      </div>
+
+    </div>
+
+    <hr class="my-6">
+
+    <!-- Motor / BHA info -->
+    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Motor / BHA Configuration</h3>
+    <div class="grid grid-cols-2 gap-4 mb-4">
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Motor Bent Angle (°)
+          <span x-show="!hasBhaFile" class="text-red-500">*</span>
+          <span x-show="autoFilled.motorBentDeg"
+                class="ml-1 text-xs font-normal text-green-600 bg-green-50 px-1.5 py-0.5 rounded"
+                x-text="'auto-filled from ' + autoFilled.motorBentDeg"></span>
+          <span x-show="hasBhaFile && !autoFilled.motorBentDeg"
+                class="ml-1 text-xs font-normal text-green-600 bg-green-50 px-1.5 py-0.5 rounded">auto-fill from BHA</span>
+        </label>
+        <input type="number" name="motor_bent_deg" step="0.01" x-model="motorBentDeg"
+               placeholder="e.g. 1.5 or 1.83"
+               :required="!hasBhaFile"
+               :class="autoFilled.motorBentDeg
+                 ? 'w-full border border-green-300 bg-green-50 rounded px-3 py-2 text-sm'
+                 : 'w-full border rounded px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500'">
+        <p x-show="!hasBhaFile && !autoFilled.motorBentDeg" class="text-xs text-gray-400 mt-1">Required when no BHA config file is uploaded.</p>
+        <p x-show="hasBhaFile && !autoFilled.motorBentDeg" class="text-xs text-green-600 mt-1">Will be auto-filled — you can still override.</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Motor Make / Type
+          <span x-show="autoFilled.motorMake"
+                class="ml-1 text-xs font-normal text-green-600 bg-green-50 px-1.5 py-0.5 rounded"
+                x-text="'auto-filled from ' + autoFilled.motorMake"></span>
+        </label>
+        <input type="text" name="motor_make" x-model="motorMake"
+               placeholder="e.g. SLB PowerPak"
+               :class="autoFilled.motorMake
+                 ? 'w-full border border-green-300 bg-green-50 rounded px-3 py-2 text-sm'
+                 : 'w-full border rounded px-3 py-2 text-sm'">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Motor Model
+          <span x-show="autoFilled.motorModel"
+                class="ml-1 text-xs font-normal text-green-600 bg-green-50 px-1.5 py-0.5 rounded"
+                x-text="'auto-filled from ' + autoFilled.motorModel"></span>
+        </label>
+        <input type="text" name="motor_model" x-model="motorModel"
+               placeholder="e.g. A825M7840XP"
+               :class="autoFilled.motorModel
+                 ? 'w-full border border-green-300 bg-green-50 rounded px-3 py-2 text-sm'
+                 : 'w-full border rounded px-3 py-2 text-sm'">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Stand Length (ft)</label>
+        <input type="number" name="stand_length_ft" step="0.1" x-model="standLength"
+               class="w-full border rounded px-3 py-2 text-sm">
+      </div>
+
+    </div>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+      <textarea name="notes" rows="2" class="w-full border rounded px-3 py-2 text-sm"></textarea>
+    </div>
+
+    <div class="flex gap-4 mt-8">
+      <button type="submit" 
+              class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none" 
+              :disabled="loading || slideLoading || bhaLoading">
+        <span x-show="!loading" class="flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          Import &amp; Compute
+        </span>
+        <span x-show="loading" class="flex items-center justify-center gap-2">
+          <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          Processing…
+        </span>
+      </button>
+      <a href="/" class="flex-1 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-6 rounded-xl text-center transition-all hover:border-gray-400">
+        Cancel
+      </a>
+    </div>
+
+    <div x-show="error" class="mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm" x-text="error"></div>
+    <div x-show="success" class="mt-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded text-sm">
+      Import successful! <a :href="'/bha-runs/'+runId" class="font-medium underline">View results →</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function importForm() {
+  return {
+    slideInfo: 'Select a slide sheet to auto-detect well name, rig, and field.',
+    bhaInfo:   'Without a BHA file, Motor Bent Angle must be entered manually.',
+    slideLoading: false,
+    bhaLoading:   false,
+    hasBhaFile:   false,
+    autoFilled:   {},   // fieldKey → source label e.g. "slide sheet" / "BHA config"
+
+    wellName: '', field: '', rig: '', client: '',
+    motorBentDeg: '', motorMake: '', motorModel: '', standLength: 100,
+    loading: false, error: '', success: false, runId: null,
+
+    // Fill a field only if currently blank; track the source
+    _fill(fieldKey, value, source) {
+      if (value && !this[fieldKey]) {
+        this[fieldKey] = value;
+        this.autoFilled = { ...this.autoFilled, [fieldKey]: source };
+      }
+    },
+
+    async slideChanged(e) {
+      const f = e.target.files[0];
+      if (!f) { this.slideInfo = 'Select a slide sheet to auto-detect well name, rig, and field.'; return; }
+      this.slideLoading = true;
+      this.slideInfo = `Reading ${f.name}…`;
+      try {
+        const fd = new FormData();
+        fd.append('slide_file', f);
+        const resp = await fetch('/api/bha-runs/preview-slide', { method: 'POST', body: fd });
+        if (resp.ok) {
+          const d = await resp.json();
+          this._fill('wellName', d.well_name, 'slide sheet');
+          this._fill('field',    d.field,     'slide sheet');
+          this._fill('rig',      d.rig,       'slide sheet');
+          this._fill('client',   d.client,    'slide sheet');
+          const detected = [d.well_name, d.field].filter(Boolean).join(', ');
+          this.slideInfo = `${f.name}${detected ? ' — detected: ' + detected : ''}`;
+        } else {
+          this.slideInfo = `Selected: ${f.name}`;
+        }
+      } catch {
+        this.slideInfo = `Selected: ${f.name}`;
+      } finally {
+        this.slideLoading = false;
+      }
+    },
+
+    async bhaChanged(e) {
+      const f = e.target.files[0];
+      if (!f) {
+        this.hasBhaFile = false;
+        this.bhaInfo = 'Without a BHA file, Motor Bent Angle must be entered manually.';
+        return;
+      }
+      this.hasBhaFile = true;
+      this.bhaLoading = true;
+      this.bhaInfo = `Reading ${f.name}…`;
+      try {
+        const fd = new FormData();
+        fd.append('bha_file', f);
+        const resp = await fetch('/api/bha-runs/preview-bha', { method: 'POST', body: fd });
+        if (resp.ok) {
+          const d = await resp.json();
+          this._fill('motorBentDeg', d.motor_bent_deg != null ? String(d.motor_bent_deg) : '', 'BHA config');
+          this._fill('motorMake',    d.motor_make,     'BHA config');
+          this._fill('motorModel',   d.motor_model,    'BHA config');
+          const parts = [];
+          if (d.motor_bent_deg != null) parts.push(`bent ${d.motor_bent_deg}°`);
+          if (d.motor_model)            parts.push(d.motor_model);
+          this.bhaInfo = `${f.name}${parts.length ? ' — ' + parts.join(', ') : ''}`;
+        } else {
+          this.bhaInfo = `${f.name} — could not read motor details`;
+        }
+      } catch {
+        this.bhaInfo = `${f.name}`;
+      } finally {
+        this.bhaLoading = false;
+      }
+    },
+
+    async submitForm() {
+      this.error = '';
+      if (!this.wellName.trim()) {
+        this.error = 'Well Name is required. Select a slide sheet or enter it manually.';
+        return;
+      }
+      if (!this.hasBhaFile && !String(this.motorBentDeg).trim()) {
+        this.error = 'Motor Bent Angle is required when no BHA config file is provided.';
+        return;
+      }
+      this.loading = true; this.success = false;
+      const form = document.getElementById('import-form');
+      const data = new FormData(form);
+      try {
+        const resp = await fetch('/api/bha-runs/import', { method: 'POST', body: data });
+        if (!resp.ok) {
+          const err = await resp.json();
+          this.error = err.detail || 'Import failed';
+        } else {
+          const result = await resp.json();
+          this.runId = result.id;
+          this.success = true;
+        }
+      } catch (e) {
+        this.error = String(e);
+      } finally {
+        this.loading = false;
+      }
+    }
+  }
+}
+</script>
+{% endblock %}
