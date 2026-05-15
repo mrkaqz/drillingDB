@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "7000:7000"
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - drilling_data:/data
+    restart: unless-stopped
+
+volumes:
+  drilling_data:

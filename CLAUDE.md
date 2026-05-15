@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Drilling Motor Output DB** — a local-network FastAPI + SQLite web app that replaces an Excel/VBA workflow for tracking directional drilling motor output across BHA runs. Drillers upload slide sheets and BHA config files; the app parses them, computes motor output, and provides cross-well analytics.
 
-- **Server:** `http://0.0.0.0:8000` (LAN accessible)
+- **Server:** `http://0.0.0.0:7000` (LAN accessible)
 - **Database:** `drilling.db` (SQLite, in `app/`)
 - **Uploaded files archived in:** `app/uploads/`
 
@@ -25,7 +25,7 @@ run.bat
 ```bat
 cd "C:\Users\RWongmalasit\Drilling Database\app"
 set PYTHONPATH=src
-.venv\Scripts\uvicorn drilling_app.main:app --host 0.0.0.0 --port 8000 --reload --app-dir src
+.venv\Scripts\uvicorn drilling_app.main:app --host 0.0.0.0 --port 7000 --reload --app-dir src
 ```
 
 ### Install dependencies

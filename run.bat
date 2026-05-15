@@ -14,5 +14,5 @@ echo Applying database migrations...
 .venv\Scripts\alembic upgrade head
 
 :: Start the server
-echo Starting Drilling Motor Output DB on http://0.0.0.0:8000
-.venv\Scripts\uvicorn drilling_app.main:app --host 0.0.0.0 --port 8000 --reload --app-dir src
+echo Starting Drilling Motor Output DB on http://0.0.0.0:7000
+.venv\Scripts\uvicorn drilling_app.main:app --host 0.0.0.0 --port 7000 --reload --app-dir src
