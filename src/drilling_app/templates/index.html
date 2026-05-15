@@ -81,26 +81,47 @@
     <table class="min-w-full divide-y divide-gray-200">
       <thead>
         <tr>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700" @click="sort('well_name')">
-            Well <span x-text="sortIcon('well_name')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('well_name')">
+            <div class="flex items-center justify-between gap-2">
+              <span>Well</span>
+              <span x-text="sortIcon('well_name')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700" @click="sort('bha_name')">
-            BHA <span x-text="sortIcon('bha_name')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('bha_name')">
+            <div class="flex items-center justify-between gap-2">
+              <span>BHA</span>
+              <span x-text="sortIcon('bha_name')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('depth_in_ft')">
-            Depth In <span x-text="sortIcon('depth_in_ft')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('depth_in_ft')">
+            <div class="flex items-center justify-end gap-1">
+              <span>Depth In</span>
+              <span x-text="sortIcon('depth_in_ft')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700" @click="sort('depth_out_ft')">
-            Depth Out <span x-text="sortIcon('depth_out_ft')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('depth_out_ft')">
+            <div class="flex items-center justify-end gap-1">
+              <span>Depth Out</span>
+              <span x-text="sortIcon('depth_out_ft')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-center cursor-pointer select-none hover:text-gray-700" @click="sort('motor_bent_deg')">
-            Bent (°) <span x-text="sortIcon('motor_bent_deg')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('motor_bent_deg')">
+            <div class="flex items-center justify-center gap-1">
+              <span>Bent (°)</span>
+              <span x-text="sortIcon('motor_bent_deg')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-center cursor-pointer select-none hover:text-gray-700" @click="sort('hole_size_in')">
-            Hole Size <span x-text="sortIcon('hole_size_in')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('hole_size_in')">
+            <div class="flex items-center justify-center gap-1">
+              <span>Hole Size</span>
+              <span x-text="sortIcon('hole_size_in')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700" @click="sort('imported_at')">
-            Imported <span x-text="sortIcon('imported_at')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('imported_at')">
+            <div class="flex items-center justify-between gap-2">
+              <span>Imported</span>
+              <span x-text="sortIcon('imported_at')" class="text-gray-400"></span>
+            </div>
           </th>
           <th class="table-head"></th>
         </tr>
