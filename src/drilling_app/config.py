@@ -17,3 +17,6 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_STAND_LENGTH_FT: float = 100.0
+
+VERSION = "0.5"
+RELEASE_DATE = "2026-05-15"

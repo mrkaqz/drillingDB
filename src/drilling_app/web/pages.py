@@ -6,12 +6,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 
-from ..config import TEMPLATE_DIR
+from ..config import TEMPLATE_DIR, VERSION, RELEASE_DATE
 from ..db import get_db
 from ..models import Well, BhaRun, BhaConfig, MotorOutput
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+templates.env.globals.update(app_version=VERSION, app_release_date=RELEASE_DATE)
 
 
 @router.get("/", response_class=HTMLResponse)

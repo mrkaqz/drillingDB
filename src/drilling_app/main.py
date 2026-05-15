@@ -12,7 +12,8 @@ from .web import pages as web_pages
 # Create all tables on startup (Alembic handles migrations; this is a fallback for fresh installs)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Drilling Motor Output DB", version="1.0.0")
+from .config import VERSION
+app = FastAPI(title="Drilling Motor Output DB", version=VERSION)
 
 # Static files
 if STATIC_DIR.exists():
