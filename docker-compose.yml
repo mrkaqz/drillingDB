@@ -6,12 +6,8 @@ services:
     environment:
       - DATA_DIR=/data
     volumes:
-      - drilling_db:/data/db
-      - drilling_uploads:/data/uploads
-      - drilling_exports:/data/exports
+      - drilling_data:/data
     restart: unless-stopped
 
 volumes:
-  drilling_db:       # SQLite database file
-  drilling_uploads:  # Uploaded source xlsx files
-  drilling_exports:  # Generated export xlsx files
+  drilling_data:  # contains db/, uploads/, and exports/ subdirectories
