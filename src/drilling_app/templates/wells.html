@@ -49,35 +49,41 @@
     <table class="min-w-full divide-y divide-gray-200">
       <thead>
         <tr>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
-              @click="sort('name')">
-            Well Name
-            <span x-text="sortIcon('name')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('name')">
+            <div class="flex items-center justify-center gap-1">
+              <span>Well Name</span>
+              <span x-text="sortIcon('name')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
-              @click="sort('field')">
-            Field
-            <span x-text="sortIcon('field')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('field')">
+            <div class="flex items-center justify-center gap-1">
+              <span>Field</span>
+              <span x-text="sortIcon('field')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
-              @click="sort('borehole')">
-            Borehole
-            <span x-text="sortIcon('borehole')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('borehole')">
+            <div class="flex items-center justify-center gap-1">
+              <span>Borehole</span>
+              <span x-text="sortIcon('borehole')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
-              @click="sort('rig')">
-            Rig
-            <span x-text="sortIcon('rig')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('rig')">
+            <div class="flex items-center justify-center gap-1">
+              <span>Rig</span>
+              <span x-text="sortIcon('rig')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-left cursor-pointer select-none hover:text-gray-700"
-              @click="sort('client')">
-            Client
-            <span x-text="sortIcon('client')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('client')">
+            <div class="flex items-center justify-center gap-1">
+              <span>Client</span>
+              <span x-text="sortIcon('client')" class="text-gray-400"></span>
+            </div>
           </th>
-          <th class="table-head text-right cursor-pointer select-none hover:text-gray-700"
-              @click="sort('run_count')">
-            BHA Runs
-            <span x-text="sortIcon('run_count')" class="ml-1 text-gray-400"></span>
+          <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('run_count')">
+            <div class="flex items-center justify-center gap-1">
+              <span>BHA Runs</span>
+              <span x-text="sortIcon('run_count')" class="text-gray-400"></span>
+            </div>
           </th>
           <th class="table-head"></th>
         </tr>

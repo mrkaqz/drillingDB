@@ -35,7 +35,7 @@
 </div>
 
 <div class="card" x-data="runsTable()" x-init="init()">
-  <div class="flex items-center justify-between mb-4">
+  <div class="flex items-center justify-center mb-4">
     <h2 class="text-lg font-semibold text-gray-900">BHA Runs</h2>
     <span class="text-xs text-gray-400" x-show="filtered.length < runs.length">
       Showing <span x-text="filtered.length"></span> of <span x-text="runs.length"></span>
@@ -82,25 +82,25 @@
       <thead>
         <tr>
           <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('well_name')">
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center justify-center gap-1">
               <span>Well</span>
               <span x-text="sortIcon('well_name')" class="text-gray-400"></span>
             </div>
           </th>
           <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('bha_name')">
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center justify-center gap-1">
               <span>BHA</span>
               <span x-text="sortIcon('bha_name')" class="text-gray-400"></span>
             </div>
           </th>
           <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('depth_in_ft')">
-            <div class="flex items-center justify-end gap-1">
+            <div class="flex items-center justify-center gap-1">
               <span>Depth In</span>
               <span x-text="sortIcon('depth_in_ft')" class="text-gray-400"></span>
             </div>
           </th>
           <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('depth_out_ft')">
-            <div class="flex items-center justify-end gap-1">
+            <div class="flex items-center justify-center gap-1">
               <span>Depth Out</span>
               <span x-text="sortIcon('depth_out_ft')" class="text-gray-400"></span>
             </div>
@@ -118,7 +118,7 @@
             </div>
           </th>
           <th class="table-head cursor-pointer select-none hover:text-gray-700" @click="sort('imported_at')">
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center justify-center gap-1">
               <span>Imported</span>
               <span x-text="sortIcon('imported_at')" class="text-gray-400"></span>
             </div>
