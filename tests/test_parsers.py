@@ -1,4 +1,8 @@
-"""Tests for slide sheet and BHA config parsers."""
+"""Tests for slide sheet and BHA config parsers.
+
+These tests require proprietary xlsx fixture files that live outside the repo.
+They are skipped automatically in CI where those files are not present.
+"""
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -12,6 +16,12 @@ SLIDE_43H = DATA_DIR / "Nong Yao A-43H_12.25in_BHA01_Slide Sheet Report-SLB_2026
 SLIDE_NTU = DATA_DIR / "NTU-A04(AD)_BHA#1_12.25in_Steering Sheet_719mMD-TD.xlsx"
 BHA_43H = DATA_DIR / "Nong Yao A-43H_BHA#1_12.25in Motor-GWD-MWD_Final.xlsx"
 BHA_LKU = DATA_DIR / "LKU-K31(KAR)_BHA#1_12.25in Motor-MWD_Final.xlsx"
+
+# Skip the entire module when fixture files are not available (e.g. CI environment)
+pytestmark = pytest.mark.skipif(
+    not SLIDE_45H.exists(),
+    reason="Fixture xlsx files not present — skipping parser tests (run locally with data files)",
+)
 from drilling_app.parsers.slide_sheet import parse as parse_slide
 from drilling_app.parsers.bha_config import parse as parse_bha
 from drilling_app.compute.motor_output import compute_motor_outputs
