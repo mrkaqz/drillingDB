@@ -2,7 +2,7 @@
 
 A local-network web app that replaces an Excel/VBA workflow for tracking directional drilling motor output across BHA runs.
 
-Drillers upload DOX/GYR/SLB slide sheets and BHA config files → the app parses them, computes motor output, and stores everything in SQLite → per-well and cross-well analytics with interactive Plotly charts.
+Drillers upload directional drilling slide sheets and BHA config files → the app parses them, computes motor output, and stores everything in SQLite → per-well and cross-well analytics with interactive Plotly charts.
 
 **Version 0.5 · Released 2026-05-15**
 
@@ -12,7 +12,7 @@ Drillers upload DOX/GYR/SLB slide sheets and BHA config files → the app parses
 
 - **Single & batch import** — drag-drop one slide sheet at a time, or point the app at a folder to import all pairs in one click
 - **Auto-fill from file** — well name, field, rig, hole size, motor bent angle, and motor model are extracted from the xlsx without manual entry
-- **Format-tolerant parser** — handles DOX modern, GYR (Jasmine/Borr Mist), and old SLB Steering Sheet formats; columns are located by header text, not fixed indices
+- **Format-tolerant parser** — handles multiple slide sheet layouts (field-unit and metric variants); columns are located by header text, not fixed indices
 - **Unit-aware** — source files in field units (ft, PPG, deg/100ft) or metric (m, SG, deg/10m) are normalised to canonical storage; display unit toggled client-side
 - **Motor output computation** — interval arithmetic replicates the Excel/VBA `Process` macro: DLS ÷ sliding footage per survey interval → deg/ft and full-stand deg
 - **Cross-well compare** — overlay motor output vs MD for multiple runs on one chart
@@ -143,13 +143,13 @@ app/
 
 ## Slide Sheet Format Support
 
-The parser uses header-text column lookup (not fixed column indices) and handles three format families:
+The parser uses header-text column lookup (not fixed column indices) and handles multiple slide sheet layouts from different software exporters:
 
-| Format | Depth | DLS | Op Mode column | Label style |
-|--------|-------|-----|----------------|-------------|
-| DOX/SLB modern | ft | deg/100ft | varies (col 10–12) | Full English |
-| GYR (Jasmine / Borr Mist) | ft | deg/100ft | col 10 | Same, label–value gap = 2 cols |
-| NTU SLB Steering Sheet (2015) | m | deg/10m | col 3 | Abbreviated (`S/N`, `Lead DD`) |
+| Variant | Depth | DLS | Op Mode column | Label style |
+|---------|-------|-----|----------------|-------------|
+| Standard field-unit (modern) | ft | deg/100ft | varies (col 10–12) | Full English |
+| Field-unit with wide label gap | ft | deg/100ft | col 10 | Same, label–value gap = 2 cols |
+| Metric / older steering sheet | m | deg/10m | col 3 | Abbreviated (`S/N`, `Lead DD`) |
 
 All values are converted to canonical storage units on import: **feet** (depth), **deg/100ft** (DLS), **PPG** (mud weight), **inches** (hole/casing size).
 
