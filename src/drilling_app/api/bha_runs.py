@@ -15,9 +15,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ..auth import require_login_api, require_readwrite_api
 from ..config import UPLOAD_DIR, DEFAULT_STAND_LENGTH_FT
 from ..db import get_db
-from ..models import BhaRun, BhaConfig, MotorOutput, Survey, SlideInterval, Well
+from ..models import BhaRun, BhaConfig, MotorOutput, Survey, SlideInterval, User, Well
 from ..parsers.slide_sheet import parse as parse_slide, _scan_header_block, _safe_float
 from ..parsers.bha_config import parse as parse_bha
 from ..compute.motor_output import compute_motor_outputs
@@ -27,7 +28,7 @@ router = APIRouter(prefix="/api/bha-runs", tags=["bha-runs"])
 
 
 @router.post("/preview-slide")
-async def preview_slide(slide_file: UploadFile = File(...)):
+async def preview_slide(slide_file: UploadFile = File(...), _: User = Depends(require_login_api)):
     """Parse slide sheet header only — returns well name, field, BHA name for form auto-fill."""
     content = await slide_file.read()
     try:
@@ -67,7 +68,7 @@ async def preview_slide(slide_file: UploadFile = File(...)):
 
 
 @router.post("/preview-bha")
-async def preview_bha(bha_file: UploadFile = File(...)):
+async def preview_bha(bha_file: UploadFile = File(...), _: User = Depends(require_login_api)):
     """Parse BHA config header — returns well name, motor bent angle, motor model for form auto-fill."""
     content = await bha_file.read()
     try:
@@ -90,7 +91,7 @@ async def preview_bha(bha_file: UploadFile = File(...)):
 
 
 @router.delete("/wells/{well_id}")
-def delete_well(well_id: int, db: Session = Depends(get_db)):
+def delete_well(well_id: int, db: Session = Depends(get_db), _: User = Depends(require_readwrite_api)):
     """Delete a well and all its BHA runs, surveys, intervals, and motor outputs."""
     well = db.query(Well).filter(Well.id == well_id).first()
     if not well:
@@ -101,7 +102,7 @@ def delete_well(well_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{run_id}")
-def delete_run(run_id: int, db: Session = Depends(get_db)):
+def delete_run(run_id: int, db: Session = Depends(get_db), _: User = Depends(require_readwrite_api)):
     """Delete a single BHA run and all its child records."""
     run = db.query(BhaRun).filter(BhaRun.id == run_id).first()
     if not run:
@@ -120,7 +121,7 @@ class BhaRunPatch(BaseModel):
 
 
 @router.patch("/{run_id}")
-def update_run(run_id: int, patch: BhaRunPatch, db: Session = Depends(get_db)):
+def update_run(run_id: int, patch: BhaRunPatch, db: Session = Depends(get_db), _: User = Depends(require_readwrite_api)):
     """Partially update editable fields on a BHA run."""
     run = db.query(BhaRun).filter(BhaRun.id == run_id).first()
     if not run:
@@ -141,7 +142,7 @@ def _get_or_create_well(db: Session, name: str, **kwargs) -> Well:
 
 
 @router.post("/import")
-async def import_bha_run(
+async def import_bha_run(  # noqa: PLR0913
     slide_file: UploadFile = File(...),
     bha_file: Optional[UploadFile] = File(None),
     well_name: str = Form(...),
@@ -155,6 +156,7 @@ async def import_bha_run(
     stand_length_ft: float = Form(DEFAULT_STAND_LENGTH_FT),
     notes: Optional[str] = Form(None),
     db: Session = Depends(get_db),
+    _: User = Depends(require_readwrite_api),
 ):
     # Save uploaded slide file
     slide_path = UPLOAD_DIR / slide_file.filename
@@ -312,7 +314,7 @@ async def import_bha_run(
 
 
 @router.get("/{run_id}/export.xlsx")
-def export_run(run_id: int, db: Session = Depends(get_db)):
+def export_run(run_id: int, db: Session = Depends(get_db), _: User = Depends(require_login_api)):
     run = db.query(BhaRun).filter(BhaRun.id == run_id).first()
     if not run:
         raise HTTPException(404)
@@ -325,7 +327,7 @@ def export_run(run_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/export.xlsx")
-def export_multiple(run_ids: str, db: Session = Depends(get_db)):
+def export_multiple(run_ids: str, db: Session = Depends(get_db), _: User = Depends(require_login_api)):
     ids = [int(x) for x in run_ids.split(",") if x.strip()]
     runs = db.query(BhaRun).filter(BhaRun.id.in_(ids)).all()
     data = build_export(runs)

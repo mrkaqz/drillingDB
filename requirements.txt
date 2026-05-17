@@ -9,3 +9,6 @@ pydantic==2.11.4
 python-dateutil==2.9.0.post0
 pytest==8.3.5
 httpx==0.28.1
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+itsdangerous==2.2.0

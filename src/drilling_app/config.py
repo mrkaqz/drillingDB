@@ -22,5 +22,14 @@ EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_STAND_LENGTH_FT: float = 100.0
 
-VERSION = "0.5"
-RELEASE_DATE = "2026-05-15"
+VERSION = "1.1"
+RELEASE_DATE = "2026-05-17"
+
+SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "change-me-in-production")
+if SESSION_SECRET_KEY == "change-me-in-production":
+    import warnings
+    warnings.warn(
+        "SESSION_SECRET_KEY is not set — using the insecure default. "
+        "Set the SESSION_SECRET_KEY environment variable before exposing this app on a network.",
+        stacklevel=1,
+    )

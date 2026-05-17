@@ -4,7 +4,7 @@ A local-network web app that replaces an Excel/VBA workflow for tracking directi
 
 Drillers upload directional drilling slide sheets and BHA config files → the app parses them, computes motor output, and stores everything in SQLite → per-well and cross-well analytics with interactive Plotly charts.
 
-**Version 0.5 · Released 2026-05-15**
+**Version 1.1 · Released 2026-05-17**
 
 ---
 

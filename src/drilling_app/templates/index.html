@@ -26,12 +26,14 @@
     </div>
   </div>
 
+  {% if current_user and current_user.role != 'readonly' %}
   <div class="ml-auto">
     <a href="/import" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center gap-2 px-6 py-2.5 rounded-xl shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 active:translate-y-0 hover:shadow-blue-300">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       Import Slide Sheet
     </a>
   </div>
+  {% endif %}
 </div>
 
 <div class="card" x-data="runsTable()" x-init="init()">

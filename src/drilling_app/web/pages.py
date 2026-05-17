@@ -6,9 +6,10 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 
+from ..auth import require_login, require_readwrite
 from ..config import TEMPLATE_DIR, VERSION, RELEASE_DATE
 from ..db import get_db
-from ..models import Well, BhaRun, BhaConfig, MotorOutput
+from ..models import User, Well, BhaRun, BhaConfig, MotorOutput
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
@@ -16,7 +17,7 @@ templates.env.globals.update(app_version=VERSION, app_release_date=RELEASE_DATE)
 
 
 @router.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, db: Session = Depends(get_db)):
+def dashboard(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_login)):
     n_wells = db.query(Well).count()
     n_runs = db.query(BhaRun).count()
     all_runs = (
@@ -41,6 +42,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     ]
     return templates.TemplateResponse("index.html", {
         "request": request,
+        "current_user": current_user,
         "n_wells": n_wells,
         "n_runs": n_runs,
         "runs_json": runs_json,
@@ -48,16 +50,17 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/import", response_class=HTMLResponse)
-def import_page(request: Request, db: Session = Depends(get_db)):
+def import_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_readwrite)):
     bha_configs = db.query(BhaConfig).order_by(BhaConfig.name).all()
     return templates.TemplateResponse("import.html", {
         "request": request,
+        "current_user": current_user,
         "bha_configs": bha_configs,
     })
 
 
 @router.get("/wells", response_class=HTMLResponse)
-def wells_list(request: Request, db: Session = Depends(get_db)):
+def wells_list(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_login)):
     wells = db.query(Well).order_by(Well.name).all()
     wells_json = [
         {
@@ -73,12 +76,13 @@ def wells_list(request: Request, db: Session = Depends(get_db)):
     ]
     return templates.TemplateResponse("wells.html", {
         "request": request,
+        "current_user": current_user,
         "wells_json": wells_json,
     })
 
 
 @router.get("/wells/{well_id}", response_class=HTMLResponse)
-def well_detail(request: Request, well_id: int, db: Session = Depends(get_db)):
+def well_detail(request: Request, well_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_login)):
     well = db.query(Well).filter(Well.id == well_id).first()
     if not well:
         raise HTTPException(404)
@@ -90,13 +94,14 @@ def well_detail(request: Request, well_id: int, db: Session = Depends(get_db)):
     )
     return templates.TemplateResponse("well_detail.html", {
         "request": request,
+        "current_user": current_user,
         "well": well,
         "runs": runs,
     })
 
 
 @router.get("/bha-runs/{run_id}", response_class=HTMLResponse)
-def run_detail(request: Request, run_id: int, db: Session = Depends(get_db)):
+def run_detail(request: Request, run_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_login)):
     run = (
         db.query(BhaRun)
         .options(joinedload(BhaRun.well), joinedload(BhaRun.motor_outputs), joinedload(BhaRun.slide_intervals))
@@ -126,6 +131,7 @@ def run_detail(request: Request, run_id: int, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse("bha_run_detail.html", {
         "request": request,
+        "current_user": current_user,
         "run": run,
         "motor_outputs": run.motor_outputs,
         "intervals": run.slide_intervals,
@@ -135,7 +141,7 @@ def run_detail(request: Request, run_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/compare", response_class=HTMLResponse)
-def compare_page(request: Request, db: Session = Depends(get_db)):
+def compare_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_login)):
     runs = (
         db.query(BhaRun)
         .options(joinedload(BhaRun.well))
@@ -144,12 +150,13 @@ def compare_page(request: Request, db: Session = Depends(get_db)):
     )
     return templates.TemplateResponse("compare.html", {
         "request": request,
+        "current_user": current_user,
         "runs": runs,
     })
 
 
 @router.get("/benchmarks", response_class=HTMLResponse)
-def benchmarks_page(request: Request, db: Session = Depends(get_db)):
+def benchmarks_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_login)):
     from collections import defaultdict
     import statistics
 
@@ -194,6 +201,7 @@ def benchmarks_page(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse("benchmarks.html", {
         "request": request,
+        "current_user": current_user,
         "rows": rows,
         "n_configs": len(rows),
         "n_runs": n_runs,
@@ -203,16 +211,17 @@ def benchmarks_page(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/batch-import", response_class=HTMLResponse)
-def batch_import_page(request: Request):
+def batch_import_page(request: Request, current_user: User = Depends(require_readwrite)):
     default_folder = r"C:\Users\RWongmalasit\Drilling Database\batch import"
     return templates.TemplateResponse("batch_import.html", {
         "request": request,
+        "current_user": current_user,
         "default_folder": default_folder,
     })
 
 
 @router.get("/bha-configs", response_class=HTMLResponse)
-def bha_configs_page(request: Request, db: Session = Depends(get_db)):
+def bha_configs_page(request: Request, db: Session = Depends(get_db), current_user: User = Depends(require_login)):
     import json as _json
     configs = db.query(BhaConfig).order_by(BhaConfig.name).all()
 
@@ -235,5 +244,6 @@ def bha_configs_page(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse("bha_configs.html", {
         "request": request,
+        "current_user": current_user,
         "cfg_data": cfg_data,
     })

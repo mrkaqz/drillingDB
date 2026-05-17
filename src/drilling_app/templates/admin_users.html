@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}User Management — Admin{% endblock %}
+{% block content %}
+
+<div class="mb-6 flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
+    <p class="text-sm text-gray-500 mt-1">Add, edit, and deactivate user accounts.</p>
+  </div>
+</div>
+
+{% if error %}
+<div class="mb-5 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+  <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+  </svg>
+  {{ error }}
+</div>
+{% endif %}
+
+{% if success %}
+<div class="mb-5 flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3">
+  <svg class="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+  </svg>
+  {{ success }}
+</div>
+{% endif %}
+
+<!-- Add User Form -->
+<div class="card mb-6">
+  <h2 class="text-base font-semibold text-gray-900 mb-4">Add New User</h2>
+  <form method="post" action="/admin/users" class="flex flex-wrap gap-3 items-end">
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Username</label>
+      <input name="username" type="text" required placeholder="e.g. john"
+             class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Password</label>
+      <input name="password" type="password" required placeholder="min 4 chars"
+             class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40">
+    </div>
+    <div>
+      <label class="block text-xs font-medium text-gray-500 mb-1">Role</label>
+      <select name="role"
+              class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <option value="readwrite">Read / Write</option>
+        <option value="readonly">Read Only</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <button type="submit" class="btn-primary text-sm">Add User</button>
+  </form>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+  <h2 class="text-base font-semibold text-gray-900 mb-4">All Users</h2>
+  {% if users %}
+  <div class="overflow-x-auto border border-gray-200 rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200 text-sm">
+      <thead>
+        <tr>
+          <th class="table-head text-left">Username</th>
+          <th class="table-head text-left">Role</th>
+          <th class="table-head text-left">Status</th>
+          <th class="table-head text-left">Created</th>
+          <th class="table-head text-left">Change Role</th>
+          <th class="table-head text-left">Reset Password</th>
+          <th class="table-head"></th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-100">
+        {% for user in users %}
+        <tr class="hover:bg-gray-50">
+          <!-- Username -->
+          <td class="px-4 py-3 font-medium text-gray-900">
+            {{ user.username }}
+            {% if user.id == current_user.id %}
+            <span class="ml-1 text-xs text-gray-400">(you)</span>
+            {% endif %}
+          </td>
+
+          <!-- Role badge -->
+          <td class="px-4 py-3">
+            {% if user.role == "admin" %}
+            <span class="badge bg-purple-100 text-purple-700">Admin</span>
+            {% elif user.role == "readwrite" %}
+            <span class="badge bg-blue-100 text-blue-700">Read / Write</span>
+            {% else %}
+            <span class="badge bg-gray-100 text-gray-600">Read Only</span>
+            {% endif %}
+          </td>
+
+          <!-- Active status -->
+          <td class="px-4 py-3">
+            {% if user.is_active %}
+            <span class="badge bg-green-100 text-green-700">Active</span>
+            {% else %}
+            <span class="badge bg-red-100 text-red-600">Inactive</span>
+            {% endif %}
+          </td>
+
+          <!-- Created -->
+          <td class="px-4 py-3 text-gray-500 whitespace-nowrap">
+            {{ user.created_at.strftime("%d %b %Y") if user.created_at else "—" }}
+          </td>
+
+          <!-- Change role -->
+          <td class="px-4 py-3">
+            {% if user.id != current_user.id %}
+            <form method="post" action="/admin/users/{{ user.id }}/set-role" class="flex gap-2 items-center">
+              <select name="role"
+                      class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <option value="readwrite" {% if user.role == "readwrite" %}selected{% endif %}>Read / Write</option>
+                <option value="readonly"  {% if user.role == "readonly"  %}selected{% endif %}>Read Only</option>
+                <option value="admin"     {% if user.role == "admin"     %}selected{% endif %}>Admin</option>
+              </select>
+              <button type="submit" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Save</button>
+            </form>
+            {% else %}
+            <span class="text-xs text-gray-400">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Reset password -->
+          <td class="px-4 py-3">
+            <form method="post" action="/admin/users/{{ user.id }}/reset-password" class="flex gap-2 items-center">
+              <input name="new_password" type="password" placeholder="new password" required
+                     class="border border-gray-300 rounded px-2 py-1 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <button type="submit" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Reset</button>
+            </form>
+          </td>
+
+          <!-- Actions: Activate / Deactivate / Delete -->
+          <td class="px-4 py-3 whitespace-nowrap">
+            {% if user.id != current_user.id %}
+            <div class="flex gap-2">
+              {% if user.is_active %}
+              <form method="post" action="/admin/users/{{ user.id }}/deactivate">
+                <button type="submit" class="text-xs text-amber-600 hover:text-amber-800 font-medium">Deactivate</button>
+              </form>
+              {% else %}
+              <form method="post" action="/admin/users/{{ user.id }}/activate">
+                <button type="submit" class="text-xs text-green-600 hover:text-green-800 font-medium">Activate</button>
+              </form>
+              {% endif %}
+              <form method="post" action="/admin/users/{{ user.id }}/delete"
+                    onsubmit="return confirm('Delete user \'{{ user.username | e }}\'? This cannot be undone.')">
+                <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium">Delete</button>
+              </form>
+            </div>
+            {% else %}
+            <span class="text-xs text-gray-400">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-gray-500 text-sm">No users yet.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

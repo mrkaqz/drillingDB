@@ -4,14 +4,15 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from ..auth import require_login_api
 from ..db import get_db
-from ..models import BhaRun, MotorOutput, Well
+from ..models import BhaRun, MotorOutput, User, Well
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
 @router.get("/compare")
-def compare_runs(run_ids: str, db: Session = Depends(get_db)):
+def compare_runs(run_ids: str, db: Session = Depends(get_db), _: User = Depends(require_login_api)):
     """Return motor output series for multiple runs for chart overlay."""
     ids = [int(x) for x in run_ids.split(",") if x.strip()]
     result = []
@@ -40,7 +41,7 @@ def compare_runs(run_ids: str, db: Session = Depends(get_db)):
 
 
 @router.get("/benchmarks")
-def benchmarks(db: Session = Depends(get_db)):
+def benchmarks(db: Session = Depends(get_db), _: User = Depends(require_login_api)):
     """Return per-BHA-config aggregated motor output stats."""
     rows = (
         db.query(

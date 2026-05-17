@@ -11,16 +11,20 @@
       {% if well.client %}<span>Client: {{ well.client }}</span>{% endif %}
     </div>
   </div>
+  {% if current_user and current_user.role != 'readonly' %}
   <button onclick="confirmDeleteWell({{ well.id }}, '{{ well.name | e }}')"
           class="btn-danger text-sm">
     Delete Well
   </button>
+  {% endif %}
 </div>
 
 <div class="card">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-lg font-semibold">BHA Runs ({{ runs|length }})</h2>
+    {% if current_user and current_user.role != 'readonly' %}
     <a href="/import" class="btn-primary text-sm">+ Add Run</a>
+    {% endif %}
   </div>
   {% if runs %}
   <div class="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
@@ -61,10 +65,12 @@
             <svg class="w-5 h-5 inline-block opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
           </td>
           <td class="px-4 py-3 text-right whitespace-nowrap" onclick="event.stopPropagation()">
+            {% if current_user and current_user.role != 'readonly' %}
             <button onclick="confirmDeleteRun({{ run.id }}, '{{ (run.bha_name or 'Run #' ~ run.id) | e }}')"
                     class="text-red-400 hover:text-red-600 transition-colors p-1" title="Delete Run">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             </button>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

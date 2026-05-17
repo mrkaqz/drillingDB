@@ -10,9 +10,10 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
 
+from ..auth import require_login_api, require_readwrite_api
 from ..config import UPLOAD_DIR, DEFAULT_STAND_LENGTH_FT
 from ..db import get_db
-from ..models import BhaRun, BhaConfig, MotorOutput, Survey, SlideInterval, Well
+from ..models import BhaRun, BhaConfig, MotorOutput, Survey, SlideInterval, User, Well
 from ..parsers.slide_sheet import parse as parse_slide
 from ..parsers.bha_config import parse as parse_bha
 from ..compute.motor_output import compute_motor_outputs
@@ -50,7 +51,7 @@ def _scan_folder(folder: Path) -> list[dict]:
 
 
 @router.get("/preview")
-def preview_batch(folder: str):
+def preview_batch(folder: str, _: User = Depends(require_login_api)):
     """Scan folder and return pairing plan without importing anything."""
     groups = _scan_folder(Path(folder))
     result = []
@@ -268,6 +269,7 @@ def run_batch_import(
     done_folder: str = Form(None),
     stand_length_ft: float = Form(DEFAULT_STAND_LENGTH_FT),
     db: Session = Depends(get_db),
+    _: User = Depends(require_readwrite_api),
 ):
     """Import all slide+BHA pairs in the folder. Moves completed files to done_folder."""
     folder_path = Path(folder)
@@ -323,6 +325,7 @@ async def batch_upload_import(
     files: List[UploadFile] = File(...),
     stand_length_ft: float = Form(DEFAULT_STAND_LENGTH_FT),
     db: Session = Depends(get_db),
+    _: User = Depends(require_readwrite_api),
 ):
     """Accept uploaded xlsx files, pair them, and import all slide+BHA pairs."""
     # Save uploaded files to a temp subdir so _scan_folder can pair them

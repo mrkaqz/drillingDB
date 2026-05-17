@@ -36,10 +36,12 @@
         <div class="hidden md:flex items-center gap-2" x-data="{ currentPath: window.location.pathname }">
           <a href="/" class="nav-link hover:text-blue-600" :class="{ 'active': currentPath === '/' }">Dashboard</a>
           <div class="w-px h-4 bg-gray-200"></div>
+          {% if current_user and current_user.role in ('admin', 'readwrite') %}
           <a href="/import" class="nav-link hover:text-blue-600" :class="{ 'active': currentPath === '/import' }">Import</a>
           <div class="w-px h-4 bg-gray-200"></div>
           <a href="/batch-import" class="nav-link hover:text-blue-600" :class="{ 'active': currentPath === '/batch-import' }">Batch Import</a>
           <div class="w-px h-4 bg-gray-200"></div>
+          {% endif %}
           <a href="/wells" class="nav-link hover:text-blue-600" :class="{ 'active': currentPath.startsWith('/wells') }">Wells</a>
           <div class="w-px h-4 bg-gray-200"></div>
           <a href="/compare" class="nav-link hover:text-blue-600" :class="{ 'active': currentPath === '/compare' }">Compare</a>
@@ -49,6 +51,33 @@
           <a href="/bha-configs" class="nav-link hover:text-blue-600" :class="{ 'active': currentPath === '/bha-configs' }">BHA Library</a>
         </div>
       </div>
+
+      <!-- Right: user info + logout -->
+      {% if current_user %}
+      <div class="flex items-center gap-3">
+        {% if current_user.role == 'admin' %}
+        <a href="/admin/users" class="nav-link text-purple-600 hover:text-purple-800" title="User Management">
+          <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+          </svg>Users
+        </a>
+        {% endif %}
+        <span class="flex items-center gap-1.5 text-sm text-gray-600">
+          <span class="text-gray-400">👤</span>
+          <span class="font-medium">{{ current_user.username }}</span>
+          {% if current_user.role == 'readonly' %}
+          <span class="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">read only</span>
+          {% elif current_user.role == 'admin' %}
+          <span class="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">admin</span>
+          {% endif %}
+        </span>
+        <form method="post" action="/logout">
+          <button type="submit" class="text-xs text-gray-400 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-red-50">
+            Sign out
+          </button>
+        </form>
+      </div>
+      {% endif %}
     </div>
   </div>
 </nav>
