@@ -10,6 +10,8 @@ Drillers upload directional drilling slide sheets and BHA config files → the a
 
 ## Features
 
+- **Login & role-based access** — username/password login with three roles: `admin`, `readwrite`, `readonly`
+- **Admin user management** — admin UI to create, deactivate, reset passwords, and assign roles
 - **Single & batch import** — drag-drop one slide sheet at a time, or point the app at a folder to import all pairs in one click
 - **Auto-fill from file** — well name, field, rig, hole size, motor bent angle, and motor model are extracted from the xlsx without manual entry
 - **Format-tolerant parser** — handles multiple slide sheet layouts (field-unit and metric variants); columns are located by header text, not fixed indices
@@ -34,6 +36,7 @@ Drillers upload directional drilling slide sheets and BHA config files → the a
 | Database | SQLite (`drilling.db`) |
 | Excel parsing / export | openpyxl |
 | Validation | Pydantic v2 |
+| Auth | passlib[bcrypt] · itsdangerous (session cookies) |
 
 ---
 
@@ -44,7 +47,7 @@ Drillers upload directional drilling slide sheets and BHA config files → the a
 - Python 3.11+
 - Windows (paths in `run.bat` use backslashes; the Python code is cross-platform)
 
-### Run
+### First-time setup
 
 ```bat
 cd "C:\path\to\drillingDB\app"
@@ -54,17 +57,40 @@ run.bat
 `run.bat` will:
 1. Create a virtualenv (`.venv`) if it doesn't exist
 2. Install all dependencies from `requirements.txt`
-3. Run `alembic upgrade head` to apply migrations
+3. Run `alembic upgrade head` to apply migrations (creates the `users` table)
 4. Start Uvicorn on `http://0.0.0.0:7000` with `--reload`
 
-Open `http://localhost:7000` in a browser. Other machines on the same LAN can reach it at `http://<server-ip>:7000`.
+Then create the first admin account:
+
+```bat
+.venv\Scripts\python -m drilling_app.create_first_user admin yourpassword
+```
+
+Open `http://localhost:7000` in a browser and log in. Other machines on the same LAN can reach it at `http://<server-ip>:7000`.
+
+Go to **Users** (top-right nav, admin only) to add further accounts and assign roles.
 
 ### Manual start (after venv exists)
 
 ```bat
 set PYTHONPATH=src
+set SESSION_SECRET_KEY=some-long-random-string
 .venv\Scripts\uvicorn drilling_app.main:app --host 0.0.0.0 --port 7000 --reload --app-dir src
 ```
+
+---
+
+## Authentication & Roles
+
+| Role | Permissions |
+|------|-------------|
+| `admin` | Full access + manage users at `/admin/users` |
+| `readwrite` | View all data + import / delete wells & runs |
+| `readonly` | View only — import and delete actions are hidden and blocked |
+
+- Session cookies are signed with `SESSION_SECRET_KEY` (set via environment variable; a warning is logged if the default is used)
+- Only admins can create accounts — there is no self-service signup
+- Admin cannot deactivate, delete, or demote their own account
 
 ---
 
@@ -79,20 +105,24 @@ app/
 ├── uploads/                        Archived source xlsx files
 ├── exports/                        Generated Motor Output.xlsx exports
 ├── migrations/
-│   └── versions/0001_initial_schema.py
+│   ├── versions/0001_initial_schema.py
+│   └── versions/0002_add_users.py
 ├── tests/
 │   ├── conftest.py
-│   └── test_parsers.py
+│   ├── test_app.py                 CI-safe smoke tests (no fixture files needed)
+│   └── test_parsers.py             Parser tests (skipped in CI — require local xlsx files)
 └── src/drilling_app/
     ├── main.py                     FastAPI app entry point
-    ├── config.py                   Paths, version, stand length default
+    ├── config.py                   Paths, version, session secret key
+    ├── auth.py                     Password hashing, session deps, role guards
     ├── db.py                       SQLAlchemy engine / session
-    ├── models.py                   ORM models
+    ├── models.py                   ORM models (incl. User)
     ├── schemas.py                  Pydantic schemas
+    ├── create_first_user.py        CLI seed script for first admin account
     ├── parsers/
     │   ├── label_map.py            Synonym table (raw label → canonical key)
     │   ├── slide_sheet.py          Slide sheet parser → ParsedSlideSheet
-    │   └── bha_config.py          BHAReport Final.xlsx parser → ParsedBhaConfig
+    │   └── bha_config.py           BHAReport Final.xlsx parser → ParsedBhaConfig
     ├── compute/
     │   ├── units.py                Unit conversions (ft↔m, deg/100ft↔deg/10m, PPG↔SG)
     │   └── motor_output.py         Motor output interval arithmetic
@@ -103,41 +133,45 @@ app/
     │   ├── batch_import.py         /api/batch/* (folder scan, batch import)
     │   └── analytics.py            /api/analytics/* (compare overlay data)
     └── web/
-        └── pages.py                HTML page routes (Jinja2 templates)
+        ├── pages.py                HTML page routes (Jinja2 templates)
+        ├── auth_routes.py          /login · /logout
+        └── admin.py                /admin/users — user management (admin only)
 ```
 
 ---
 
 ## Pages
 
-| URL | Description |
-|-----|-------------|
-| `/` | Dashboard — BHA runs table with search, filter, and sort |
-| `/import` | Single slide sheet import with auto-fill from file |
-| `/batch-import` | Batch import from a server-side folder path |
-| `/wells` | Wells list |
-| `/wells/{id}` | Well detail + BHA runs; delete well or individual runs |
-| `/bha-runs/{id}` | Run detail: motor output chart + table with ft/m unit toggle |
-| `/compare` | Multi-run overlay chart |
-| `/benchmarks` | Motor output stats grouped by bent angle / hole size / motor model |
-| `/bha-configs` | BHA config library (browse, auto-imported from Final.xlsx) |
+| URL | Auth required | Description |
+|-----|---------------|-------------|
+| `/login` | — | Login page |
+| `/` | any | Dashboard — BHA runs table with search, filter, and sort |
+| `/import` | readwrite+ | Single slide sheet import with auto-fill from file |
+| `/batch-import` | readwrite+ | Batch import from a server-side folder path |
+| `/wells` | any | Wells list |
+| `/wells/{id}` | any | Well detail + BHA runs; delete well or individual runs |
+| `/bha-runs/{id}` | any | Run detail: motor output chart + table with ft/m unit toggle |
+| `/compare` | any | Multi-run overlay chart |
+| `/benchmarks` | any | Motor output stats grouped by bent angle / hole size / motor model |
+| `/bha-configs` | any | BHA config library (browse, auto-imported from Final.xlsx) |
+| `/admin/users` | admin | Create / manage user accounts and roles |
 
 ---
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/bha-runs/preview-slide` | Parse slide header → JSON for form auto-fill |
-| POST | `/api/bha-runs/preview-bha` | Parse BHA Final header → JSON for form auto-fill |
-| POST | `/api/bha-runs/import` | Full single import (slide + optional BHA config) |
-| PATCH | `/api/bha-runs/{id}` | Update motor bent deg / make / model / notes |
-| DELETE | `/api/bha-runs/{id}` | Delete a BHA run and all child records |
-| DELETE | `/api/bha-runs/wells/{id}` | Delete a well and all its runs |
-| GET | `/api/bha-runs/{id}/export.xlsx` | Export one run to legacy Motor Output.xlsx |
-| GET | `/api/bha-runs/export.xlsx?run_ids=1,2` | Export multiple runs |
-| GET | `/api/batch/preview` | Scan folder, return pairing plan |
-| POST | `/api/batch/import` | Import all pairs, move source files to `imported/` subfolder |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/bha-runs/preview-slide` | any | Parse slide header → JSON for form auto-fill |
+| POST | `/api/bha-runs/preview-bha` | any | Parse BHA Final header → JSON for form auto-fill |
+| POST | `/api/bha-runs/import` | readwrite+ | Full single import (slide + optional BHA config) |
+| PATCH | `/api/bha-runs/{id}` | readwrite+ | Update motor bent deg / make / model / notes |
+| DELETE | `/api/bha-runs/{id}` | readwrite+ | Delete a BHA run and all child records |
+| DELETE | `/api/bha-runs/wells/{id}` | readwrite+ | Delete a well and all its runs |
+| GET | `/api/bha-runs/{id}/export.xlsx` | any | Export one run to legacy Motor Output.xlsx |
+| GET | `/api/bha-runs/export.xlsx?run_ids=1,2` | any | Export multiple runs |
+| GET | `/api/batch/preview` | any | Scan folder, return pairing plan |
+| POST | `/api/batch/import` | readwrite+ | Import all pairs, move source files to `imported/` subfolder |
 
 ---
 
@@ -158,6 +192,7 @@ All values are converted to canonical storage units on import: **feet** (depth),
 ## Database Schema
 
 ```
+users            id, username, hashed_password, role, is_active, created_at
 wells            id, name, field, borehole, rig, client, notes
 bha_configs      id, name, hole_size_in, motor_make, motor_model, motor_bent_deg,
                  bend_to_bit_ft, stabilizers_json, sensor_offsets_json, nozzles_json
@@ -178,7 +213,8 @@ cd "C:\path\to\drillingDB\app"
 .venv\Scripts\pytest tests/ -v
 ```
 
-Tests reference xlsx fixture files from the parent folder. They skip gracefully if those files are absent.
+- **`test_app.py`** — CI-safe smoke tests; run everywhere, no external files needed
+- **`test_parsers.py`** — full parser + compute tests; skipped automatically when the xlsx fixture files are not present (e.g. CI)
 
 ---
 
@@ -186,6 +222,7 @@ Tests reference xlsx fixture files from the parent folder. They skip gracefully 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `SESSION_SECRET_KEY` | `change-me-in-production` | Signs session cookies. **Set this before exposing the app on a network.** Changing it invalidates all active sessions. |
 | `DATA_DIR` | *(none — uses `app/`)* | Override data root (for Docker volume mounts). DB goes in `$DATA_DIR/db/`, uploads in `$DATA_DIR/uploads/` |
 
 ---
@@ -195,3 +232,4 @@ Tests reference xlsx fixture files from the parent folder. They skip gracefully 
 - [ ] Phase 3: one-time backfill script for the legacy `Motor Output.xlsx` historical wide-format file
 - [ ] Multi-well export UI trigger (`/export.xlsx?well_ids=...` endpoint exists, no button yet)
 - [ ] NSSM Windows service setup for always-on LAN deployment
+- [ ] Self-service password change for non-admin users
