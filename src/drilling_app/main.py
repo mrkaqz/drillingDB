@@ -18,6 +18,29 @@ from .web import admin as admin_web
 # Create all tables on startup (Alembic handles migrations; this is a fallback for fresh installs)
 Base.metadata.create_all(bind=engine)
 
+# Seed default admin if no users exist yet
+def _seed_default_admin() -> None:
+    from sqlalchemy.orm import Session
+    from .models import User
+    from .auth import hash_password
+    with Session(engine) as db:
+        if db.query(User).count() == 0:
+            db.add(User(
+                username="admin",
+                hashed_password=hash_password("admin1234"),
+                role="admin",
+                is_active=True,
+            ))
+            db.commit()
+            import logging
+            logging.getLogger(__name__).warning(
+                "No users found — default admin account created. "
+                "Username: admin  Password: admin1234  "
+                "Change this password immediately via /admin/users."
+            )
+
+_seed_default_admin()
+
 app = FastAPI(title="Drilling Motor Output DB", version=VERSION)
 
 # Session middleware (must be added before routers)

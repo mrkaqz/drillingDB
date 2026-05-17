@@ -60,11 +60,13 @@ run.bat
 3. Run `alembic upgrade head` to apply migrations (creates the `users` table)
 4. Start Uvicorn on `http://0.0.0.0:7000` with `--reload`
 
-Then create the first admin account:
+On first start, if no users exist in the database, a default admin account is created automatically:
 
-```bat
-.venv\Scripts\python -m drilling_app.create_first_user admin yourpassword
-```
+| Username | Password |
+|----------|----------|
+| `admin` | `admin1234` |
+
+> **Change the default password immediately** after first login via **Users → Reset Password**.
 
 Open `http://localhost:7000` in a browser and log in. Other machines on the same LAN can reach it at `http://<server-ip>:7000`.
 
