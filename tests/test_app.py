@@ -6,6 +6,8 @@ initialise correctly. They run in every environment including CI.
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 
@@ -57,8 +59,8 @@ def test_unit_conversions():
 
     # 1 deg/100ft → 1 deg/100ft (identity)
     assert abs(dls_from_100ft(1.0, "deg/100ft") - 1.0) < 1e-9
-    # 1 deg/100ft → ~0.3048 deg/30m
-    assert abs(dls_from_100ft(1.0, "deg/30m") - 0.3048) < 1e-3
+    # 1 deg/100ft → ~0.9843 deg/30m  (100ft = 30.48m, so 1 deg/30.48m * 30 = 30/30.48)
+    assert abs(dls_from_100ft(1.0, "deg/30m") - (30.0 / 30.48)) < 1e-4
 
 
 def test_motor_output_compute():
