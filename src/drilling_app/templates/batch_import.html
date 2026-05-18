@@ -7,7 +7,7 @@
 </div>
 
 <!-- Tab switcher -->
-<div x-data="{ tab: 'upload' }" class="mb-6">
+<div x-data="{ tab: 'upload' }" @set-tab.window="tab = $event.detail" class="mb-6">
   <div class="flex border-b border-gray-200 mb-6">
     <button @click="tab = 'upload'"
             :class="tab === 'upload' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'"
@@ -41,12 +41,27 @@
                   d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
           <p class="text-gray-600 font-medium mb-1">Drag &amp; drop xlsx files here</p>
-          <p class="text-gray-400 text-sm mb-4">or click to browse — select all slide sheets and BHA Final reports together</p>
-          <label class="btn-primary text-sm cursor-pointer">
-            Browse Files
-            <input type="file" multiple accept=".xlsx,.xls" class="hidden"
-                   @change="onFiles($event.target.files)">
-          </label>
+          <p class="text-gray-400 text-sm mb-4">or use one of the options below</p>
+          <div class="flex flex-wrap justify-center gap-2">
+            <!-- Folder picker — Chrome/Edge only via File System Access API -->
+            <button x-show="folderPickerSupported"
+                    @click="pickFolder()"
+                    class="btn-primary text-sm cursor-pointer flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+              </svg>
+              Select Folder
+            </button>
+            <label class="btn-secondary text-sm cursor-pointer">
+              Browse Files
+              <input type="file" multiple accept=".xlsx,.xls" class="hidden"
+                     @change="onFiles($event.target.files)">
+            </label>
+          </div>
+          <p x-show="folderPickerSupported" class="text-xs text-gray-400 mt-3">
+            <strong>Select Folder</strong> reads all xlsx files from a local folder — works from any machine.
+          </p>
         </div>
       </div>
 
@@ -206,6 +221,20 @@
   <!-- ── Folder Path tab ──────────────────────────────────────── -->
   <div x-show="tab === 'folder'" x-data="batchImport()">
 
+    <div class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 mb-5 flex gap-3 text-sm text-amber-800">
+      <svg class="w-5 h-5 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      </svg>
+      <div>
+        <span class="font-semibold">Server-side paths only.</span>
+        The folder path is read from the machine running this app — not from your browser.
+        If you're accessing the app from a different computer, switch to the
+        <button @click="$dispatch('set-tab', 'upload')" class="underline font-medium hover:text-amber-900 cursor-pointer">Upload Files</button>
+        tab and use the <strong>Select Folder</strong> button to pick a local folder directly from your browser (Chrome / Edge).
+      </div>
+    </div>
+
     <div class="card mb-6">
       <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Folder Settings</h2>
       <div class="grid grid-cols-1 gap-4 mb-4">
@@ -336,12 +365,35 @@ function uploadBatch() {
     importing:  false,
     dragOver:   false,
     fileCount:  0,
+    folderPickerSupported: typeof window !== 'undefined' && 'showDirectoryPicker' in window,
 
     onFiles(fileList) {
       // Merge new files in; duplicate filenames overwrite the previous copy
       for (const f of fileList) this.allFiles[f.name] = f;
       this.fileCount = Object.keys(this.allFiles).length;
       this.groups = this.pairFiles(Object.values(this.allFiles));
+    },
+
+    async pickFolder() {
+      // File System Access API — Chrome / Edge 86+
+      let dirHandle;
+      try {
+        dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+      } catch (e) {
+        if (e.name !== 'AbortError') alert('Could not open folder: ' + e);
+        return;
+      }
+      const files = [];
+      for await (const [name, handle] of dirHandle.entries()) {
+        if (handle.kind === 'file' && /\.(xlsx|xls)$/i.test(name)) {
+          files.push(await handle.getFile());
+        }
+      }
+      if (files.length === 0) {
+        alert('No Excel (.xlsx / .xls) files found in that folder.');
+        return;
+      }
+      this.onFiles(files);
     },
 
     pairFiles(fileList) {
