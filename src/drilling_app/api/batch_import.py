@@ -88,6 +88,14 @@ def _import_one(
         return {"status": "error", "message": f"Slide sheet parse error: {e}"}
     parsed.source_filename = slide_path.name
 
+    # Skip duplicate: same filename already imported
+    existing = db.query(BhaRun).filter(BhaRun.source_filename == slide_path.name).first()
+    if existing:
+        return {
+            "status": "skipped",
+            "message": f"Already imported as run #{existing.id} — skipped.",
+        }
+
     # Validate: must be a motor slide sheet (not a rotation-only run).
     # Inverted logic: skip only when ALL parsed intervals are known rotation-only
     # modes.  Any unrecognized mode string is treated as potentially sliding so

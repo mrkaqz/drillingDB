@@ -158,6 +158,16 @@ async def import_bha_run(  # noqa: PLR0913
     db: Session = Depends(get_db),
     _: User = Depends(require_readwrite_api),
 ):
+    # Reject duplicate: same filename already imported
+    existing = db.query(BhaRun).filter(BhaRun.source_filename == slide_file.filename).first()
+    if existing:
+        raise HTTPException(
+            409,
+            f"'{slide_file.filename}' has already been imported (run #{existing.id} "
+            f"for well '{existing.well.name if existing.well else '?'}')."
+            " Delete that run first if you want to re-import it.",
+        )
+
     # Save uploaded slide file
     slide_path = UPLOAD_DIR / slide_file.filename
     with slide_path.open("wb") as f:
