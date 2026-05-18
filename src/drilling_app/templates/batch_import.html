@@ -350,7 +350,8 @@ function uploadBatch() {
         const stem = f.name.replace(/\.[^.]+$/, '');
         const key = stem.split('_')[0].trim();
         if (!groups[key]) groups[key] = { key, slide: null, bha: null, canImport: false };
-        if (stem.toLowerCase().includes('_final')) groups[key].bha = f;
+        const stemL = stem.toLowerCase();
+        if (stemL.includes('_final') || stemL.includes(' final')) groups[key].bha = f;
         else groups[key].slide = f;
       }
       return Object.values(groups)

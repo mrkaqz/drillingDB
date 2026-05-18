@@ -22,7 +22,10 @@ router = APIRouter(prefix="/api/batch", tags=["batch"])
 
 
 def _is_bha_file(path: Path) -> bool:
-    return "_final" in path.stem.lower()
+    # Match both "..._Final..." (underscore) and "... Final..." (space),
+    # e.g. "BHA#1 Final_20150407" as well as the more common "_Final" suffix.
+    stem_lower = path.stem.lower()
+    return "_final" in stem_lower or " final" in stem_lower
 
 
 def _well_key(path: Path) -> str:
