@@ -50,6 +50,22 @@ def _scan_folder(folder: Path) -> list[dict]:
     return sorted(groups.values(), key=lambda g: g["key"])
 
 
+def _move_to_done(src: Path, done_dir: Path) -> None:
+    """Move *src* into *done_dir*, handling the case where a file with the
+    same name already exists (appends a numeric suffix rather than crashing)."""
+    if not src.exists():
+        return  # already moved or deleted — nothing to do
+    dest = done_dir / src.name
+    if dest.exists():
+        # Avoid FileExistsError on Windows: rename with a suffix
+        stem, suffix = src.stem, src.suffix
+        counter = 1
+        while dest.exists():
+            dest = done_dir / f"{stem}_{counter}{suffix}"
+            counter += 1
+    shutil.move(str(src), dest)
+
+
 @router.get("/preview")
 def preview_batch(folder: str, _: User = Depends(require_login_api)):
     """Scan folder and return pairing plan without importing anything."""
@@ -333,11 +349,13 @@ def run_batch_import(
         result["bha_file"] = bha.name if bha else None
         results.append(result)
 
-        # Move originals to done folder on success
-        if result["status"] == "ok":
-            shutil.move(str(slide), done_path / slide.name)
+        # Move originals to done folder for ok AND skipped (already-imported /
+        # rotation-only).  Leave files in place only on error so the user can
+        # fix the problem and re-import.
+        if result["status"] in ("ok", "skipped"):
+            _move_to_done(slide, done_path)
             if bha:
-                shutil.move(str(bha), done_path / bha.name)
+                _move_to_done(bha, done_path)
 
     return {"results": results, "done_folder": str(done_path)}
 
