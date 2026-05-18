@@ -225,6 +225,10 @@ async def import_bha_run(  # noqa: PLR0913
 
     # Get or create well
     h = parsed.header
+    # _sf: safely coerce a header value to float — guards against the parser
+    # returning a column label string instead of a numeric value.
+    def _sf(k): return _safe_float(h.get(k))
+
     well = _get_or_create_well(
         db, well_name,
         field=field or h.get("field"),
@@ -234,32 +238,33 @@ async def import_bha_run(  # noqa: PLR0913
         client=client or h.get("client"),
     )
 
-    # Create BHA run
+    # Create BHA run — all Float fields go through _sf() to prevent
+    # SQLAlchemy StatementError when the parser returns a label string.
     run = BhaRun(
         well_id=well.id,
         bha_config_id=bha_config_id,
         bha_name=h.get("bha_name"),
         bit_run_number=h.get("bit_run_number"),
         source_unit_system=parsed.source_unit_system,
-        hole_size_in=h.get("hole_size_in"),
-        casing_shoe_ft=h.get("casing_shoe"),
+        hole_size_in=_sf("hole_size_in"),
+        casing_shoe_ft=_sf("casing_shoe"),
         mud_type=h.get("mud_type"),
-        end_mw_ppg=h.get("end_mw_ppg"),
+        end_mw_ppg=_sf("end_mw_ppg"),
         motor_bent_deg=motor_bent_deg,
         motor_make=motor_make,
         motor_model=motor_model,
-        depth_in_ft=h.get("depth_in"),
-        depth_out_ft=h.get("depth_out"),
-        incl_in_deg=h.get("incl_in_deg"),
-        incl_out_deg=h.get("incl_out_deg"),
-        azimuth_in_deg=h.get("azimuth_in_deg"),
-        azimuth_out_deg=h.get("azimuth_out_deg"),
+        depth_in_ft=_sf("depth_in"),
+        depth_out_ft=_sf("depth_out"),
+        incl_in_deg=_sf("incl_in_deg"),
+        incl_out_deg=_sf("incl_out_deg"),
+        azimuth_in_deg=_sf("azimuth_in_deg"),
+        azimuth_out_deg=_sf("azimuth_out_deg"),
         date_in=h.get("date_in"),
         date_td=h.get("date_td"),
         date_out=h.get("date_out"),
-        drilling_hours=h.get("drilling_hours"),
-        pumping_hours=h.get("pumping_hours"),
-        brt_hours=h.get("brt_hours"),
+        drilling_hours=_sf("drilling_hours"),
+        pumping_hours=_sf("pumping_hours"),
+        brt_hours=_sf("brt_hours"),
         dd_primary=None,
         dd_secondary=None,
         client_rep_primary=h.get("client_rep_primary"),
@@ -269,7 +274,7 @@ async def import_bha_run(  # noqa: PLR0913
         bit_manuf=h.get("bit_manuf"),
         bit_iadc=h.get("bit_iadc"),
         bit_jets=h.get("bit_jets"),
-        bit_tfa_in2=h.get("bit_tfa_in2"),
+        bit_tfa_in2=_sf("bit_tfa_in2"),
         stand_length_ft=stand_length_ft,
         source_filename=parsed.source_filename,
         notes=notes,

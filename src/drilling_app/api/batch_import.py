@@ -14,7 +14,7 @@ from ..auth import require_login_api, require_readwrite_api
 from ..config import UPLOAD_DIR, DEFAULT_STAND_LENGTH_FT
 from ..db import get_db
 from ..models import BhaRun, BhaConfig, MotorOutput, Survey, SlideInterval, User, Well
-from ..parsers.slide_sheet import parse as parse_slide
+from ..parsers.slide_sheet import parse as parse_slide, _safe_float
 from ..parsers.bha_config import parse as parse_bha
 from ..compute.motor_output import compute_motor_outputs
 
@@ -171,104 +171,118 @@ def _import_one(
     else:
         well_name = slide_path.stem.split("_")[0].strip()
 
-    well = _get_or_create_well(
-        db, well_name,
-        field=_h("field"),
-        borehole=borehole or None,
-        rig=_h("rig"),
-        client=_h("client"),
-    )
+    # _sf: safely coerce a header value to float; returns None if it's a string
+    # label or otherwise non-numeric (parser can return header label text for
+    # some file formats when a cell is mis-identified as a value).
+    def _sf(k): return _safe_float(_h(k))
 
-    # Create BHA run
-    run = BhaRun(
-        well_id=well.id,
-        bha_config_id=bha_config_id,
-        bha_name=_h("bha_name"),
-        bit_run_number=_h("bit_run_number"),
-        source_unit_system=parsed.source_unit_system,
-        hole_size_in=_h("hole_size_in"),
-        casing_shoe_ft=_h("casing_shoe"),
-        mud_type=_h("mud_type"),
-        end_mw_ppg=_h("end_mw_ppg"),
-        motor_bent_deg=motor_bent_deg,
-        motor_make=motor_make,
-        motor_model=motor_model,
-        depth_in_ft=_h("depth_in"),
-        depth_out_ft=_h("depth_out"),
-        incl_in_deg=_h("incl_in_deg"),
-        incl_out_deg=_h("incl_out_deg"),
-        azimuth_in_deg=_h("azimuth_in_deg"),
-        azimuth_out_deg=_h("azimuth_out_deg"),
-        date_in=_h("date_in"),
-        date_td=_h("date_td"),
-        date_out=_h("date_out"),
-        drilling_hours=_h("drilling_hours"),
-        pumping_hours=_h("pumping_hours"),
-        brt_hours=_h("brt_hours"),
-        dd_primary=_h("dd_primary"),
-        dd_secondary=_h("dd_secondary"),
-        client_rep_primary=_h("client_rep_primary"),
-        client_rep_secondary=_h("client_rep_secondary"),
-        bit_serial=_h("bit_serial"),
-        bit_type=_h("bit_type"),
-        bit_manuf=_h("bit_manuf"),
-        bit_iadc=_h("bit_iadc"),
-        bit_jets=_h("bit_jets"),
-        bit_tfa_in2=_h("bit_tfa_in2"),
-        stand_length_ft=stand_length_ft,
-        source_filename=slide_path.name,
-        notes=None,
-    )
-    db.add(run)
-    db.flush()
+    try:
+        well = _get_or_create_well(
+            db, well_name,
+            field=_h("field"),
+            borehole=borehole or None,
+            rig=_h("rig"),
+            client=_h("client"),
+        )
 
-    for s in parsed.surveys:
-        db.add(Survey(
-            bha_run_id=run.id,
-            sequence=s.sequence,
-            svy_md_ft=s.svy_md_ft,
-            incl_deg=s.incl_deg,
-            azmth_deg=s.azmth_deg,
-            dls_deg_per_100ft=s.dls_deg_per_100ft,
-        ))
+        # Create BHA run — all Float fields go through _sf() to prevent
+        # SQLAlchemy StatementError when the parser returns a label string.
+        run = BhaRun(
+            well_id=well.id,
+            bha_config_id=bha_config_id,
+            bha_name=_h("bha_name"),
+            bit_run_number=_h("bit_run_number"),
+            source_unit_system=parsed.source_unit_system,
+            hole_size_in=_sf("hole_size_in"),
+            casing_shoe_ft=_sf("casing_shoe"),
+            mud_type=_h("mud_type"),
+            end_mw_ppg=_sf("end_mw_ppg"),
+            motor_bent_deg=motor_bent_deg,
+            motor_make=motor_make,
+            motor_model=motor_model,
+            depth_in_ft=_sf("depth_in"),
+            depth_out_ft=_sf("depth_out"),
+            incl_in_deg=_sf("incl_in_deg"),
+            incl_out_deg=_sf("incl_out_deg"),
+            azimuth_in_deg=_sf("azimuth_in_deg"),
+            azimuth_out_deg=_sf("azimuth_out_deg"),
+            date_in=_h("date_in"),
+            date_td=_h("date_td"),
+            date_out=_h("date_out"),
+            drilling_hours=_sf("drilling_hours"),
+            pumping_hours=_sf("pumping_hours"),
+            brt_hours=_sf("brt_hours"),
+            dd_primary=_h("dd_primary"),
+            dd_secondary=_h("dd_secondary"),
+            client_rep_primary=_h("client_rep_primary"),
+            client_rep_secondary=_h("client_rep_secondary"),
+            bit_serial=_h("bit_serial"),
+            bit_type=_h("bit_type"),
+            bit_manuf=_h("bit_manuf"),
+            bit_iadc=_h("bit_iadc"),
+            bit_jets=_h("bit_jets"),
+            bit_tfa_in2=_sf("bit_tfa_in2"),
+            stand_length_ft=stand_length_ft,
+            source_filename=slide_path.name,
+            notes=None,
+        )
+        db.add(run)
+        db.flush()
 
-    for iv in parsed.intervals:
-        db.add(SlideInterval(
-            bha_run_id=run.id,
-            sequence=iv.sequence,
-            md_from_ft=iv.md_from_ft,
-            md_to_ft=iv.md_to_ft,
-            mode=iv.mode,
-            course_ft=iv.course_ft,
-            calc_rop=iv.calc_rop,
-            tf_mode=iv.tf_mode,
-            tf_angle=iv.tf_angle,
-            start_time=iv.start_time,
-            end_time=iv.end_time,
-        ))
+        for s in parsed.surveys:
+            db.add(Survey(
+                bha_run_id=run.id,
+                sequence=s.sequence,
+                svy_md_ft=s.svy_md_ft,
+                incl_deg=s.incl_deg,
+                azmth_deg=s.azmth_deg,
+                dls_deg_per_100ft=s.dls_deg_per_100ft,
+            ))
 
-    mo_rows = compute_motor_outputs(parsed.surveys, parsed.intervals, stand_length_ft)
-    for mo in mo_rows:
-        db.add(MotorOutput(
-            bha_run_id=run.id,
-            sequence=mo.sequence,
-            svy_md_ft=mo.svy_md_ft,
-            incl_deg=mo.incl_deg,
-            azmth_deg=mo.azmth_deg,
-            dls_deg_per_100ft=mo.dls_deg_per_100ft,
-            slide_footage_ft=mo.slide_footage_ft,
-            motor_output_deg_per_ft=mo.motor_output_deg_per_ft,
-            full_stand_deg=mo.full_stand_deg,
-        ))
+        for iv in parsed.intervals:
+            db.add(SlideInterval(
+                bha_run_id=run.id,
+                sequence=iv.sequence,
+                md_from_ft=iv.md_from_ft,
+                md_to_ft=iv.md_to_ft,
+                mode=iv.mode,
+                course_ft=iv.course_ft,
+                calc_rop=iv.calc_rop,
+                tf_mode=iv.tf_mode,
+                tf_angle=iv.tf_angle,
+                start_time=iv.start_time,
+                end_time=iv.end_time,
+            ))
 
-    db.commit()
-    return {
-        "status": "ok",
-        "well_name": well_name,
-        "run_id": run.id,
-        "well_id": well.id,
-        "message": f"Imported as run #{run.id}",
-    }
+        mo_rows = compute_motor_outputs(parsed.surveys, parsed.intervals, stand_length_ft)
+        for mo in mo_rows:
+            db.add(MotorOutput(
+                bha_run_id=run.id,
+                sequence=mo.sequence,
+                svy_md_ft=mo.svy_md_ft,
+                incl_deg=mo.incl_deg,
+                azmth_deg=mo.azmth_deg,
+                dls_deg_per_100ft=mo.dls_deg_per_100ft,
+                slide_footage_ft=mo.slide_footage_ft,
+                motor_output_deg_per_ft=mo.motor_output_deg_per_ft,
+                full_stand_deg=mo.full_stand_deg,
+            ))
+
+        db.commit()
+        return {
+            "status": "ok",
+            "well_name": well_name,
+            "run_id": run.id,
+            "well_id": well.id,
+            "message": f"Imported as run #{run.id}",
+        }
+
+    except Exception as exc:
+        db.rollback()
+        return {
+            "status": "error",
+            "message": f"Import error: {exc}",
+        }
 
 
 @router.post("/import")
