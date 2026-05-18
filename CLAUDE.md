@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Drilling Motor Output DB** — a local-network FastAPI + SQLite web app that replaces an Excel/VBA workflow for tracking directional drilling motor output across BHA runs. Drillers upload slide sheets and BHA config files; the app parses them, computes motor output, and provides cross-well analytics.
 
-- **Version:** 1.2 (released 2026-05-18)
+- **Version:** 1.3 (released 2026-05-18)
 - **Server:** `http://0.0.0.0:7000` (LAN accessible)
 - **Database:** `drilling.db` (SQLite, in `app/`)
 - **Uploaded files archived in:** `app/uploads/`
@@ -160,8 +160,10 @@ The header scanner looks **up to 2 cells ahead** (not just 1) for the value afte
 Priority order:
 1. `borehole` field — if it contains a space (compound name like `"Nong Yao A-43H(EJ)"`)
 2. First `_`-segment of `bha_name` — if it contains a space (e.g. `"Jasmine A-39(AAA)"`)
-3. `borehole` as-is (short code)
-4. Raw `well_name` field (often a slot/platform ID like `"D6"` — not useful as well name)
+3. First `_`-segment of filename — if it contains a space (e.g. `"Jasmine D-40H(DB-AN)"`)
+   Preferred over a short-code `borehole` like `"D-40H(DBAN)"` that has no space.
+4. `borehole` as-is (short code — no space)
+5. Raw `well_name` field (often a slot/platform ID like `"D6"` — not useful as well name)
 
 ### Slide sheet format variants
 | Format | Depth | DLS | Op Mode column | Label style |

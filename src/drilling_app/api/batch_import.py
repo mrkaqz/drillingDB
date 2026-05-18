@@ -184,17 +184,22 @@ def _import_one(
     bha_name_val = str(_h("bha_name") or "").strip()
     bha_first = bha_name_val.split("_")[0].strip() if bha_name_val else ""
     well_name_raw = str(_h("well_name") or "").strip()
+    filename_first = slide_path.stem.split("_")[0].strip()
 
     if " " in borehole:
         well_name = borehole
     elif " " in bha_first:
         well_name = bha_first
+    elif " " in filename_first:
+        # Filename first segment has a space → it's a compound name (e.g. "Jasmine D-40H(DB-AN)").
+        # Prefer it over a short-code borehole like "D-40H(DBAN)" that has no space.
+        well_name = filename_first
     elif borehole:
         well_name = borehole
     elif well_name_raw:
         well_name = well_name_raw
     else:
-        well_name = slide_path.stem.split("_")[0].strip()
+        well_name = filename_first
 
     # _sf: safely coerce a header value to float; returns None if it's a string
     # label or otherwise non-numeric (parser can return header label text for

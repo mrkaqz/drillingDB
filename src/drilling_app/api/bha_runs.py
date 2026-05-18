@@ -42,14 +42,19 @@ async def preview_slide(slide_file: UploadFile = File(...), _: User = Depends(re
         # Priority:
         #   1. Borehole — if it contains a space it's a compound name ("Nong Yao A-43H(EJ)")
         #   2. First "_"-segment of BHA Run name — often "Jasmine A-39(AAA)"
-        #   3. Borehole as-is (short code like "A39(AAA)")
-        #   4. Raw "Well" value as last resort
+        #   3. First "_"-segment of filename — if it has a space (e.g. "Jasmine D-40H(DB-AN)")
+        #      Preferred over a short-code borehole like "D-40H(DBAN)" that has no space.
+        #   4. Borehole as-is (short code like "A39(AAA)")
+        #   5. Raw "Well" value as last resort
         borehole = _s("borehole") or ""
         bha_first = (_s("bha_name") or "").split("_")[0].strip()
+        filename_first = Path(slide_file.filename).stem.split("_")[0].strip() if slide_file.filename else ""
         if " " in borehole:
             well_name = borehole
         elif " " in bha_first:
             well_name = bha_first
+        elif " " in filename_first:
+            well_name = filename_first
         elif borehole:
             well_name = borehole
         else:

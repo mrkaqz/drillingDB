@@ -22,7 +22,7 @@ EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_STAND_LENGTH_FT: float = 100.0
 
-VERSION = "1.2"
+VERSION = "1.3"
 RELEASE_DATE = "2026-05-18"
 
 SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "change-me-in-production")
