@@ -177,7 +177,13 @@ async def import_bha_run(  # noqa: PLR0913
     try:
         parsed = parse_slide(str(slide_path))
     except Exception as e:
-        raise HTTPException(400, f"Slide sheet parse error: {e}")
+        msg = str(e)
+        if "not a zip file" in msg.lower() or "badzipfile" in type(e).__name__.lower():
+            msg = (
+                "File is corrupted or incomplete (not a valid xlsx). "
+                "Re-export the file from Excel and try again."
+            )
+        raise HTTPException(400, f"Slide sheet parse error: {msg}")
     parsed.source_filename = slide_file.filename
 
     # Parse BHA config if provided

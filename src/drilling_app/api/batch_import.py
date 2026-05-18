@@ -104,7 +104,13 @@ def _import_one(
     try:
         parsed = parse_slide(str(slide_path))
     except Exception as e:
-        return {"status": "error", "message": f"Slide sheet parse error: {e}"}
+        msg = str(e)
+        if "not a zip file" in msg.lower() or "badzipfile" in type(e).__name__.lower():
+            msg = (
+                "File is corrupted or incomplete (not a valid xlsx). "
+                "Re-export the file from Excel and try again."
+            )
+        return {"status": "error", "message": f"Slide sheet parse error: {msg}"}
     parsed.source_filename = slide_path.name
 
     # Skip duplicate: same filename already imported
